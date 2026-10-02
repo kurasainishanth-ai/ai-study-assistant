@@ -1,0 +1,24 @@
+# Introduction to Photosynthesis & Cellular Respiration
+
+## 1. Photosynthesis Overview
+Photosynthesis is the biological process used by plants, algae, and certain bacteria to convert light energy (usually from the Sun) into chemical energy stored in glucose molecules.
+
+- **Chemical Equation:**
+  6CO2 + 6H2O + Light Energy -> C6H12O6 + 6O2
+  (Carbon Dioxide + Water + Light -> Glucose + Oxygen)
+
+- **Location:** Occurs inside chloroplasts. Chlorophyll is the green pigment responsible for capturing photon energy.
+- **Two Main Stages:**
+  1. Light-Dependent Reactions: Take place in thylakoid membranes; water is split, releasing oxygen (O2) and generating ATP and NADPH.
+  2. Calvin Cycle (Light-Independent): Takes place in the stroma; CO2 is fixed into glucose using ATP and NADPH.
+
+## 2. Cellular Respiration Overview
+Cellular respiration is the metabolic process by which cells break down glucose and other organic molecules to release energy in the form of ATP.
+
+- **Chemical Equation:**
+  C6H12O6 + 6O2 -> 6CO2 + 6H2O + ~36-38 ATP
+- **Key Difference:** Photosynthesis stores energy in glucose, while cellular respiration extracts energy from glucose.
+- **Three Main Stages:**
+  1. Glycolysis (Cytoplasm): Breaks glucose (6 carbons) into 2 pyruvate molecules (3 carbons each). Net yield: 2 ATP. Anaerobic (requires no oxygen).
+  2. Krebs Cycle / Citric Acid Cycle (Mitochondrial Matrix): Generates electron carriers (NADH, FADH2) and 2 ATP.
+  3. Oxidative Phosphorylation / Electron Transport Chain (Inner Mitochondrial Membrane): Produces the vast majority of ATP (~32-34 ATP) using oxygen as the final electron acceptor.

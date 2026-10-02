@@ -1,0 +1,75 @@
+import re
+from typing import List, Dict, Any, Optional
+from google.genai import types
+from config import get_gemini_client, DEFAULT_MODEL
+import db
+
+LEVEL_INSTRUCTIONS = {
+    "simple": "Explain in simple, everyday language as if talking to a middle school or early high school student. Use friendly analogies and avoid unnecessary jargon.",
+    "intermediate": "Explain at a standard college or AP high school level. Balance clarity, accurate scientific/academic terminology, and practical examples.",
+    "university": "Provide rigorous, university-level explanations. Analyze theoretical nuances, underlying mechanisms, edge cases, and formal academic concepts."
+}
+
+def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate") -> Dict[str, Any]:
+    """Generates a conversational response grounded in the uploaded material with citations."""
+    material = db.get_material(doc_id)
+    if not material:
+        raise ValueError(f"Study material with ID '{doc_id}' not found.")
+        
+    doc_content = material.get("content", "")
+    if not doc_content.strip():
+        return {
+            "answer": "The selected document does not contain readable text to reference.",
+            "citations": [],
+            "level": level
+        }
+
+    # Fetch recent chat history
+    history = db.get_chat_history(doc_id)
+    history_context = []
+    for msg in history[-6:]:
+        prefix = "Student: " if msg["role"] == "user" else "Tutor: "
+        history_context.append(f"{prefix}{msg['content']}")
+    history_str = "\n".join(history_context)
+
+    level_guide = LEVEL_INSTRUCTIONS.get(level, LEVEL_INSTRUCTIONS["intermediate"])
+
+    system_instruction = (
+        "You are StudyVerse AI Tutor, an empathetic, highly knowledgeable, and intellectually honest academic mentor. "
+        "Strictly adhere to these rules:\n"
+        "1. GROUNDING: Answer using ONLY the factual content provided in the study material below. "
+        "If the material does NOT contain enough information to answer, explicitly state: 'The uploaded study material does not contain sufficient information to answer this question.'\n"
+        "2. CITATIONS: Whenever stating a fact or concept, cite the exact source marker from the text if available, like [Page X], [Slide Y], or [Section Title].\n"
+        f"3. TONE & DEPTH: {level_guide}\n"
+        "4. PEDAGOGY: Break complex thoughts into logical steps, provide helpful analogies, and invite thoughtful follow-ups."
+    )
+
+    prompt = (
+        f"STUDY MATERIAL (Source: '{material['name']}'):\n"
+        f"{doc_content}\n\n"
+        f"CONVERSATION HISTORY:\n"
+        f"{history_str}\n\n"
+        f"STUDENT QUESTION:\n"
+        f"{question}\n\n"
+        "TUTOR RESPONSE (Include citations like [Page X] or [Slide Y] where applicable):"
+    )
+
+    from services.gemini_caller import call_gemini_with_retry
+    answer_text = call_gemini_with_retry(
+        contents=[prompt],
+        system_instruction=system_instruction,
+        temperature=0.3
+    )
+
+    # Extract citations like [Page 1], [Slide 2], etc.
+    citations = list(set(re.findall(r"\[(?:Page|Slide|Section)\s*[^\]]+\]", answer_text, re.IGNORECASE)))
+
+    # Persist in SQLite
+    db.save_chat_message(doc_id=doc_id, role="user", content=question, level=level)
+    db.save_chat_message(doc_id=doc_id, role="assistant", content=answer_text, level=level, citations=citations)
+
+    return {
+        "answer": answer_text,
+        "citations": citations,
+        "level": level
+    }
