@@ -21,6 +21,8 @@ from summarizer import (
 )
 import db
 from services.ai_tutor import ask_ai_tutor
+from agent.orchestrator import generate_dynamic_response
+
 from services.flashcard_service import generate_flashcards
 from services.quiz_service import generate_quiz, evaluate_quiz
 from services.knowledge_map_service import generate_knowledge_map
@@ -367,8 +369,16 @@ def delete_flashcard_endpoint(card_id: int):
 def tutor_chat_endpoint(req: TutorChatRequest):
     """Conversational tutor grounded in document content with citations."""
     try:
-        result = ask_ai_tutor(req.doc_id, req.message, level=req.level)
-        return result
+        # Use our integrated dynamic agent instead of the legacy text-only tutor
+        result = generate_dynamic_response(req.doc_id, req.message)
+        # Adapt agent output format to frontend expectations
+        return {
+            'content': result.get('summary', ''),
+            'response': result.get('summary', ''),
+            'citations': [],
+            'level': req.level,
+            'raw_agent_response': result
+        }
     except GeminiClientAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
     except GeminiTemporaryUnavailableError as e:
