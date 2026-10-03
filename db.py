@@ -96,6 +96,28 @@ def init_db():
             )
         """)
 
+        # Generated quizzes are stored separately from attempts so an in-progress
+        # quiz can be restored after a refresh without being re-generated.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS generated_quizzes (
+                doc_id TEXT PRIMARY KEY,
+                questions TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (doc_id) REFERENCES materials (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Persist the latest map per material.  Replacing a map only happens
+        # after a successful explicit regeneration.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_maps (
+                doc_id TEXT PRIMARY KEY,
+                graph_data TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (doc_id) REFERENCES materials (id) ON DELETE CASCADE
+            )
+        """)
+
         # 6. Activity Log
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS activity_log (
@@ -194,6 +216,8 @@ def delete_material(doc_id: str):
         cursor.execute("DELETE FROM flashcards WHERE doc_id = ?", (doc_id,))
         cursor.execute("DELETE FROM chat_messages WHERE doc_id = ?", (doc_id,))
         cursor.execute("DELETE FROM quiz_attempts WHERE doc_id = ?", (doc_id,))
+        cursor.execute("DELETE FROM generated_quizzes WHERE doc_id = ?", (doc_id,))
+        cursor.execute("DELETE FROM knowledge_maps WHERE doc_id = ?", (doc_id,))
         conn.commit()
 
 # --- Smart Notes Operations ---
@@ -233,6 +257,52 @@ def delete_note(note_id: int):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM notes WHERE id = ?", (note_id,))
         conn.commit()
+
+# --- Generated Study Sets ---
+
+def save_generated_quiz(doc_id: str, questions: List[Dict[str, Any]]):
+    init_db()
+    now_str = datetime.now().strftime("%b %d, %H:%M")
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO generated_quizzes (doc_id, questions, created_at) VALUES (?, ?, ?)",
+            (doc_id, json.dumps(questions), now_str)
+        )
+        conn.commit()
+
+def get_generated_quiz(doc_id: str) -> Optional[Dict[str, Any]]:
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM generated_quizzes WHERE doc_id = ?", (doc_id,)).fetchone()
+        if not row:
+            return None
+        try:
+            questions = json.loads(row["questions"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return {"doc_id": doc_id, "questions": questions, "created_at": row["created_at"]}
+
+def save_knowledge_map(doc_id: str, graph_data: Dict[str, Any]):
+    init_db()
+    now_str = datetime.now().strftime("%b %d, %H:%M")
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO knowledge_maps (doc_id, graph_data, created_at) VALUES (?, ?, ?)",
+            (doc_id, json.dumps(graph_data), now_str)
+        )
+        conn.commit()
+
+def get_knowledge_map(doc_id: str) -> Optional[Dict[str, Any]]:
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM knowledge_maps WHERE doc_id = ?", (doc_id,)).fetchone()
+        if not row:
+            return None
+        try:
+            data = json.loads(row["graph_data"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
 
 # --- Flashcards & SRS Operations ---
 

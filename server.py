@@ -356,8 +356,13 @@ def delete_note_endpoint(note_id: int):
 @app.post("/api/flashcards/generate")
 def generate_flashcards_endpoint(req: FlashcardGenerateRequest):
     """Generates source-grounded flashcards with SRS metadata."""
-    cards = generate_flashcards(req.doc_id, count=req.count, difficulty=req.difficulty)
-    return cards
+    try:
+        cards = generate_flashcards(req.doc_id, count=req.count, difficulty=req.difficulty)
+        if not cards:
+            raise HTTPException(status_code=422, detail="No flashcards could be generated from the readable document content.")
+        return cards
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @app.get("/api/flashcards/{doc_id}")
 def get_flashcards_endpoint(doc_id: str):
@@ -385,13 +390,16 @@ def delete_flashcard_endpoint(card_id: int):
 def tutor_chat_endpoint(req: TutorChatRequest):
     """Conversational AI study agent with dynamic response formats."""
     try:
-        result = generate_dynamic_response(req.doc_id, req.message)
+        # ask_ai_tutor is the source-grounded path that records both messages
+        # and returns usable citations.  The former agent call discarded this
+        # state, making the history endpoint appear broken.
+        result = ask_ai_tutor(req.doc_id, req.message, req.level)
         return {
-            'content': result.get('summary', ''),
-            'response': result.get('summary', ''),
-            'citations': [],
+            'content': result.get('answer', ''),
+            'response': result.get('answer', ''),
+            'citations': result.get('citations', []),
             'level': req.level,
-            'raw_agent_response': result
+            'raw_agent_response': None
         }
     except GeminiClientAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
@@ -403,6 +411,8 @@ def tutor_chat_endpoint(req: TutorChatRequest):
         raise HTTPException(status_code=429, detail=f"Rate limit reached, please try again shortly: {str(e)}")
     except (GeminiTemporaryUnavailableError, GeminiServiceTemporaryError) as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
@@ -425,8 +435,20 @@ def clear_tutor_history_endpoint(doc_id: str):
 @app.post("/api/quiz/generate")
 def generate_quiz_endpoint(req: QuizGenerateRequest):
     """Generates diagnostic quiz questions grounded in study material."""
-    questions = generate_quiz(req.doc_id, num_questions=req.num_questions, difficulty=req.difficulty)
-    return questions
+    try:
+        questions = generate_quiz(req.doc_id, num_questions=req.num_questions, difficulty=req.difficulty)
+        if not questions:
+            raise HTTPException(status_code=422, detail="No quiz questions could be generated from the readable document content.")
+        db.save_generated_quiz(req.doc_id, questions)
+        return {"doc_id": req.doc_id, "questions": questions}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@app.get("/api/quiz/generated/{doc_id}")
+def get_generated_quiz_endpoint(doc_id: str):
+    """Restores the latest generated quiz without triggering Gemini."""
+    saved = db.get_generated_quiz(doc_id)
+    return saved or {"doc_id": doc_id, "questions": []}
 
 @app.post("/api/quiz/submit")
 def submit_quiz_endpoint(req: QuizSubmitRequest):
@@ -446,8 +468,20 @@ def get_quiz_attempts_endpoint(doc_id: str):
 
 @app.get("/api/knowledge-map/{doc_id}")
 def get_knowledge_map_endpoint(doc_id: str):
-    """Extracts authentic topic nodes and flags topics needing revision."""
-    return generate_knowledge_map(doc_id)
+    """Restores the persisted map; GET never unexpectedly runs generation."""
+    return db.get_knowledge_map(doc_id) or {"nodes": [], "edges": []}
+
+@app.post("/api/knowledge-map/{doc_id}")
+def generate_knowledge_map_endpoint(doc_id: str):
+    """Explicitly generates and saves a new source-grounded map."""
+    try:
+        graph = generate_knowledge_map(doc_id)
+        if not graph.get("nodes"):
+            raise HTTPException(status_code=422, detail=graph.get("empty_reason", "No map could be generated from this material."))
+        db.save_knowledge_map(doc_id, graph)
+        return graph
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # =========================================================

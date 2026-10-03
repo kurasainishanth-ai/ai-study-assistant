@@ -73,8 +73,28 @@ def generate_knowledge_map(doc_id: str) -> Dict[str, Any]:
                 edges.append({"source": f"node_{i}", "target": nid, "relationship": "leads_to"})
         graph_data = {"nodes": nodes, "edges": edges}
 
+    # Validate untrusted model graph data before it reaches the graph renderer.
+    raw_nodes = graph_data.get("nodes", []) if isinstance(graph_data, dict) else []
+    nodes, ids = [], set()
+    for index, node in enumerate(raw_nodes):
+        if not isinstance(node, dict):
+            continue
+        node_id = str(node.get("id") or f"node_{index + 1}").strip()
+        label = str(node.get("label") or "").strip()
+        if not node_id or not label or node_id in ids:
+            continue
+        ids.add(node_id)
+        nodes.append({"id": node_id, "label": label[:140], "category": str(node.get("category") or "core"), "summary": str(node.get("summary") or ""), "source_ref": str(node.get("source_ref") or "")})
+    edges = []
+    for edge in graph_data.get("edges", []) if isinstance(graph_data, dict) else []:
+        if not isinstance(edge, dict):
+            continue
+        source, target = str(edge.get("source") or ""), str(edge.get("target") or "")
+        if source in ids and target in ids and source != target:
+            edges.append({"source": source, "target": target, "relationship": str(edge.get("relationship") or "related_to")})
+
     # Annotate nodes with review status based on genuine student quiz attempts
-    for node in graph_data.get("nodes", []):
+    for node in nodes:
         label_lower = node.get("label", "").lower()
         if any(w in label_lower for w in weak_topics):
             node["needs_revision"] = True
@@ -83,4 +103,4 @@ def generate_knowledge_map(doc_id: str) -> Dict[str, Any]:
             node["needs_revision"] = False
             node["status_badge"] = "Good Standing"
 
-    return graph_data
+    return {"nodes": nodes, "edges": edges}

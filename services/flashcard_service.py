@@ -62,6 +62,23 @@ def generate_flashcards(doc_id: str, count: int = 8, difficulty: str = "mixed") 
     if not isinstance(cards, list):
         cards = []
 
+    # Store only complete, renderer-safe question/answer pairs.
+    normalized_cards = []
+    for item in cards:
+        if not isinstance(item, dict):
+            continue
+        front = str(item.get("front", "")).strip()
+        back = str(item.get("back", "")).strip()
+        if not front or not back:
+            continue
+        normalized_cards.append({
+            "front": front, "back": back,
+            "topic": str(item.get("topic") or "General").strip(),
+            "difficulty": str(item.get("difficulty") or difficulty).lower(),
+            "source_ref": str(item.get("source_ref") or "").strip(),
+        })
+    cards = normalized_cards
+
     # Store in SQLite
     if cards:
         db.save_flashcards(doc_id, cards)

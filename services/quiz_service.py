@@ -54,12 +54,203 @@ def generate_quiz(doc_id: str, num_questions: int = 5, difficulty: str = "medium
         questions = json.loads(raw_text)
     except Exception:
         questions = []
+    if not isinstance(questions, list):
+        return []
+    normalized = []
+    for index, item in enumerate(questions, start=1):
+        if not isinstance(item, dict):
+            continue
+        question = str(item.get("question") or "").strip()
+        answer = str(item.get("correct_answer") or "").strip()
+        raw_options = item.get("options") or []
+        options = [str(option).strip() for option in raw_options if str(option).strip()] if isinstance(raw_options, list) else []
+        question_type = str(item.get("type") or ("mcq" if options else "short_answer")).lower()
+        if not question or not answer or (question_type in ("mcq", "true_false") and not options):
+            continue
+        normalized.append({"id": item.get("id") or index, "type": question_type, "question": question, "options": options, "correct_answer": answer, "rationale": str(item.get("rationale") or item.get("explanation") or "").strip(), "topic": str(item.get("topic") or "General").strip(), "source_ref": str(item.get("source_ref") or "").strip()})
+    return normalized
 
-    return questions if isinstance(questions, list) else []
 
 
+import json
+import re
+from typing import List, Dict, Any
+import db
+from services.gemini_caller import call_gemini_with_retry
 
 def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Dict[str, str]) -> Dict[str, Any]:
+    material = db.get_material(doc_id)
+    doc_name = material['name'] if material else 'Study Document'
+
+    correct_count = 0
+    total = len(questions)
+    evaluations = []
+    topic_breakdown = {}
+    
+    # We will gather all descriptive questions that need LLM evaluation
+    descriptive_to_eval = []
+    
+    for idx, q in enumerate(questions):
+        q_id_field = str(q.get('id', idx + 1))
+        # Support dict format (e.g. from frontend) where answers might be keyed by id or index
+        user_ans = (
+            str(user_answers.get(q_id_field, '')).strip()
+            or str(user_answers.get(str(idx), '')).strip()
+            or str(user_answers.get(str(idx + 1), '')).strip()
+        )
+        correct_ans = str(q.get('correct_answer', '')).strip()
+        topic = q.get('topic', 'General')
+        q_type = str(q.get('type', 'mcq')).lower()
+        options = q.get('options', [])
+
+        topic_breakdown.setdefault(topic, {'correct': 0, 'total': 0})
+        topic_breakdown[topic]['total'] += 1
+
+        is_correct = False
+        needs_llm = False
+        
+        if not user_ans:
+            is_correct = False
+        elif q_type in ('mcq', 'true_false') or options:
+            # Deterministic matching
+            if user_ans.lower() == correct_ans.lower():
+                is_correct = True
+            elif len(user_ans) == 1 and correct_ans.upper().startswith(user_ans.upper()):
+                is_correct = True
+            elif len(correct_ans) == 1 and user_ans.upper().startswith(correct_ans.upper()):
+                is_correct = True
+        else:
+            # Short answer / descriptive. Try deterministic first.
+            if user_ans.lower() == correct_ans.lower():
+                is_correct = True
+            else:
+                needs_llm = True
+                
+        eval_item = {
+            'id': q_id_field,
+            'question': q.get('question', ''),
+            'student_answer': user_ans or 'No answer submitted',
+            'correct_answer': correct_ans,
+            'is_correct': is_correct,
+            'explanation': q.get('rationale', q.get('explanation', '')),
+            'topic': topic,
+            'source_ref': q.get('source_ref', ''),
+            'misconception_analysis': None,
+            'targeted_follow_up': None,
+            'needs_llm': needs_llm, # Temporary flag
+            'idx': idx # Temporary flag
+        }
+        evaluations.append(eval_item)
+        
+        if needs_llm:
+            descriptive_to_eval.append(eval_item)
+
+    # Batch LLM Evaluation for descriptive answers
+    if descriptive_to_eval:
+        llm_prompt = (
+            "You are an expert academic evaluator. Grade the following student answers.\n"
+            "Respond with a JSON array where each object has 'id' (the question id), "
+            "'is_correct' (boolean, true if the student demonstrates understanding, false otherwise), "
+            "and 'feedback' (concise explanation of why it is right or wrong).\n\n"
+        )
+        
+        for item in descriptive_to_eval:
+            llm_prompt += f"Question ID: {item['id']}\nQ: {item['question']}\nExpected Answer: {item['correct_answer']}\nStudent Answer: {item['student_answer']}\n\n"
+            
+        try:
+            raw = call_gemini_with_retry(contents=[llm_prompt], temperature=0.1)
+            raw = re.sub(r'^`(?:json)?', '', raw.strip()).strip()
+            raw = re.sub(r'`, '', raw).strip()
+            llm_results = json.loads(raw)
+            if isinstance(llm_results, list):
+                for res in llm_results:
+                    # Find corresponding evaluation item
+                    for ev in evaluations:
+                        if ev['id'] == str(res.get('id')):
+                            ev['is_correct'] = bool(res.get('is_correct', False))
+                            if res.get('feedback'):
+                                ev['explanation'] = res['feedback']
+                            break
+        except Exception:
+            # If LLM evaluation fails, default to false (which it already is)
+            pass
+
+    # Post-process and count correct
+    for ev in evaluations:
+        # Remove temporary flags
+        ev.pop('needs_llm', None)
+        idx = ev.pop('idx', 0)
+        
+        if ev['is_correct']:
+            correct_count += 1
+            topic_breakdown[ev['topic']]['correct'] += 1
+
+    # Misconception Detector 
+    incorrect_evals = [e for e in evaluations if not e['is_correct'] and e['student_answer'] != 'No answer submitted']
+
+    if incorrect_evals:
+        error_summary = "\n".join([
+            f"Question: {item['question']}\nStudent Answered: {item['student_answer']}\n"
+            f"Correct Answer: {item['correct_answer']}\nTopic: {item['topic']}\n"
+            for item in incorrect_evals[:3]
+        ])
+
+        misconception_prompt = (
+            "You are the StudyVerse Misconception Detector. Analyze the student errors below.\n"
+            "For each incorrect answer, respond with a JSON array matching this exact schema:\n"
+            "[\n  {\n    \"question\": \"exact question text\",\n    \"misconception\": \"one-sentence possible misconception\",\n    \"follow_up\": \"one targeted follow-up checkpoint question\"\n  }\n]\n"
+            "Return only pure JSON.\n\n"
+            f"STUDENT ERRORS:\n{error_summary}"
+        )
+
+        misconception_map = {}
+        try:
+            raw = call_gemini_with_retry(contents=[misconception_prompt], temperature=0.25)
+            raw = re.sub(r'^`(?:json)?', '', raw.strip()).strip()
+            raw = re.sub(r'`, '', raw).strip()
+            mc_items = json.loads(raw)
+            if isinstance(mc_items, list):
+                for mc in mc_items:
+                    key = mc.get('question', '').strip().lower()[:60]
+                    misconception_map[key] = mc
+        except Exception:
+            pass 
+
+        for ev in evaluations:
+            if not ev['is_correct'] and ev['student_answer'] != 'No answer submitted':
+                key = ev['question'].strip().lower()[:60]
+                mc = misconception_map.get(key)
+                if mc:
+                    ev['misconception_analysis'] = mc.get('misconception', '')
+                    ev['targeted_follow_up'] = mc.get('follow_up', '')
+
+        if misconception_map:
+            summary_parts = [f"• {mc['misconception']}" for mc in misconception_map.values() if mc.get('misconception')]
+            misconception_analysis_text = "\n".join(summary_parts) if summary_parts else "Review incorrect answers above."
+        else:
+            misconception_analysis_text = "Review your incorrect answers and their explanations to clarify definitions."
+    else:
+        misconception_analysis_text = "Outstanding work! No misconceptions identified on this attempt."
+
+    db.save_quiz_attempt(
+        doc_id=doc_id,
+        doc_name=doc_name,
+        score=correct_count,
+        total_questions=total,
+        topic_breakdown=topic_breakdown,
+        details=evaluations
+    )
+
+    percentage = round((correct_count / max(total, 1)) * 100, 1)
+
+    return {
+        "score": correct_count,
+        "total_questions": total,
+        "percentage": percentage,
+        "evaluations": evaluations,
+        "topic_breakdown": topic_breakdown,
+        "misconception_analysis": misconception_analysis_text,
+    }
     """
     Evaluates student quiz answers, activates Misconception Detector for errors,
     records the attempt in SQLite, and provides targeted follow-ups.
@@ -200,4 +391,3 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
         "topic_breakdown": topic_breakdown,
         "misconception_analysis": misconception_analysis_text,
     }
-
