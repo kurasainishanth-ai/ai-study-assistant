@@ -11,7 +11,8 @@ import {
   Sparkles,
   ArrowRight,
   RefreshCw,
-  Flame
+  Flame,
+  Activity
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -38,148 +39,172 @@ export default function ProgressView({ onNavigateTab }) {
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="glass-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-violet-400" />
-            Learning Progress & Mastery Analytics
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Transparent, uninflated metrics tracked directly in your local SQLite database.
-          </p>
+    <div className="min-h-full bg-[#0a0a0f] py-10 px-4 sm:px-8 text-slate-300">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-white tracking-tight flex items-center gap-2">
+              <Activity className="w-6 h-6 text-slate-400" />
+              Progress Analytics
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Transparent, uninflated metrics tracked directly in your local SQLite database.
+            </p>
+          </div>
+          <button
+            onClick={loadProgress}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#141419] hover:bg-[#1a1a24] border border-slate-800/50 rounded-lg text-sm font-medium text-slate-200 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </button>
         </div>
 
-        <button
-          onClick={loadProgress}
-          className="btn btn-secondary text-xs py-2 px-3.5 flex items-center gap-1.5"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>Refresh Analytics</span>
-        </button>
-      </div>
+        {errorMsg && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-400 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5" />
+            {errorMsg}
+          </div>
+        )}
 
-      {errorMsg && (
-        <div className="bg-rose-950/80 border border-rose-800 text-rose-200 px-4 py-2.5 rounded-xl text-xs">
-          {errorMsg}
-        </div>
-      )}
-
-      {/* KPI Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-card p-5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Documents Loaded</span>
-            <BookOpen className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="text-2xl font-bold text-white font-mono">
-            {progress?.materials_count ?? 0}
-          </div>
-          <div className="text-[10px] text-slate-500">Stored in StudyVerse DB</div>
-        </div>
-
-        <div className="glass-card p-5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Flashcards Active</span>
-            <Layers className="w-4 h-4 text-violet-400" />
-          </div>
-          <div className="text-2xl font-bold text-violet-300 font-mono">
-            {progress?.flashcards_count ?? 0}
-          </div>
-          <div className="text-[10px] text-slate-500">
-            {progress?.cards_mastered ?? 0} Mastered · {progress?.cards_review_needed ?? 0} Due
-          </div>
-        </div>
-
-        <div className="glass-card p-5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Quiz Accuracy</span>
-            <Award className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-2xl font-bold text-emerald-400 font-mono">
-            {progress?.average_quiz_accuracy ?? 0}%
-          </div>
-          <div className="text-[10px] text-slate-500">
-            {progress?.quizzes_taken ?? 0} Diagnostic Quizzes Taken
-          </div>
-        </div>
-
-        <div className="glass-card p-5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Study Streak</span>
-            <Flame className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-bold text-amber-300 font-mono">
-            {progress?.streak_days ?? 1} Day{progress?.streak_days === 1 ? '' : 's'}
-          </div>
-          <div className="text-[10px] text-slate-500">Active learning streak</div>
-        </div>
-      </div>
-
-      {/* Two Column Layout: Recommended Activities & Topic Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Recommended Activities */}
-        <div className="glass-card p-6 space-y-4">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-violet-400" />
-            Recommended Next Activities
-          </h3>
-
-          <div className="space-y-3">
-            {(progress?.recommended_activities || [
-              { title: 'Upload your first study material', tab: 'library', desc: 'Add lecture slides or textbook chapters.' },
-              { title: 'Generate high-yield flashcards', tab: 'flashcards', desc: 'Build an active-recall deck with spaced repetition.' },
-              { title: 'Take a diagnostic quiz', tab: 'quiz', desc: 'Identify possible misconceptions and test retention.' }
-            ]).map((act, i) => (
-              <div
-                key={i}
-                onClick={() => act.tab && onNavigateTab(act.tab)}
-                className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-violet-500/50 hover:bg-slate-900 cursor-pointer transition flex items-center justify-between group"
-              >
-                <div>
-                  <h4 className="text-xs font-bold text-slate-200 group-hover:text-violet-300 transition">
-                    {act.title}
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">{act.desc}</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-violet-400 group-hover:translate-x-0.5 transition" />
+        {/* Bento Box KPI Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-[#141419] p-6 rounded-2xl border border-slate-800/50 flex flex-col justify-between hover:border-slate-700/50 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-blue-400" />
               </div>
-            ))}
+            </div>
+            <div>
+              <div className="text-3xl font-semibold text-white tracking-tight">
+                {progress?.materials_count ?? 0}
+              </div>
+              <div className="text-sm text-slate-500 mt-1">Documents Loaded</div>
+            </div>
+          </div>
+
+          <div className="bg-[#141419] p-6 rounded-2xl border border-slate-800/50 flex flex-col justify-between hover:border-slate-700/50 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                <Layers className="w-4 h-4 text-indigo-400" />
+              </div>
+              <span className="text-xs font-medium bg-indigo-500/10 text-indigo-400 px-2.5 py-1 rounded-full border border-indigo-500/20">
+                {progress?.cards_mastered ?? 0} Mastered
+              </span>
+            </div>
+            <div>
+              <div className="text-3xl font-semibold text-white tracking-tight">
+                {progress?.flashcards_count ?? 0}
+              </div>
+              <div className="text-sm text-slate-500 mt-1">Active Flashcards</div>
+            </div>
+          </div>
+
+          <div className="bg-[#141419] p-6 rounded-2xl border border-slate-800/50 flex flex-col justify-between hover:border-slate-700/50 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <Award className="w-4 h-4 text-emerald-400" />
+              </div>
+              <span className="text-xs font-medium bg-slate-800/50 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700/50">
+                {progress?.quizzes_taken ?? 0} Taken
+              </span>
+            </div>
+            <div>
+              <div className="text-3xl font-semibold text-white tracking-tight">
+                {progress?.average_quiz_accuracy ?? 0}%
+              </div>
+              <div className="text-sm text-slate-500 mt-1">Quiz Accuracy</div>
+            </div>
+          </div>
+
+          <div className="bg-[#141419] p-6 rounded-2xl border border-slate-800/50 flex flex-col justify-between hover:border-slate-700/50 transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                <Flame className="w-4 h-4 text-amber-400" />
+              </div>
+            </div>
+            <div>
+              <div className="text-3xl font-semibold text-white tracking-tight flex items-baseline gap-1">
+                {progress?.streak_days ?? 0}
+                <span className="text-lg font-normal text-slate-500">
+                  Day{progress?.streak_days !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="text-sm text-slate-500 mt-1">Active Streak</div>
+            </div>
           </div>
         </div>
 
-        {/* Topic Mastery & Activity Timeline */}
-        <div className="glass-card p-6 space-y-4">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Award className="w-4 h-4 text-cyan-400" />
-            Recent Activity Log
-          </h3>
-
-          {progress?.recent_activity && progress.recent_activity.length > 0 ? (
-            <div className="space-y-2.5">
-              {progress.recent_activity.map((item, idx) => (
+        {/* Dashboard Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Next Steps */}
+          <div className="bg-[#141419] rounded-2xl border border-slate-800/50 overflow-hidden">
+            <div className="p-6 border-b border-slate-800/50 bg-[#1a1a24]/30">
+              <h3 className="text-base font-medium text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-indigo-400" />
+                Recommended Next Steps
+              </h3>
+            </div>
+            <div className="p-4 space-y-2">
+              {(progress?.recommended_activities || [
+                { title: 'Upload your first study material', tab: 'library', desc: 'Add lecture slides or textbook chapters.' },
+                { title: 'Generate high-yield flashcards', tab: 'flashcards', desc: 'Build an active-recall deck with spaced repetition.' },
+                { title: 'Take a diagnostic quiz', tab: 'quiz', desc: 'Identify possible misconceptions and test retention.' }
+              ]).map((act, i) => (
                 <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-xl bg-slate-900/40 border border-slate-800/80 text-xs"
+                  key={i}
+                  onClick={() => act.tab && onNavigateTab(act.tab)}
+                  className="group flex items-start gap-4 p-4 rounded-xl bg-[#0a0a0f]/50 hover:bg-[#1a1a24] border border-transparent hover:border-slate-700/50 cursor-pointer transition-all"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                    <div>
-                      <div className="font-semibold text-slate-200">{item.action}</div>
-                      <div className="text-[10px] text-slate-500">{item.detail}</div>
-                    </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-slate-200 group-hover:text-indigo-300 transition-colors">
+                      {act.title}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">{act.desc}</p>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-mono">{item.timestamp}</span>
+                  <ArrowRight className="w-4 h-4 text-slate-600 group-hover:text-indigo-400 transform group-hover:translate-x-1 transition-all mt-1" />
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              <Calendar className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-xs">No activity logged yet. Start studying to record sessions!</p>
+          </div>
+
+          {/* Activity Log */}
+          <div className="bg-[#141419] rounded-2xl border border-slate-800/50 overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-800/50 bg-[#1a1a24]/30">
+              <h3 className="text-base font-medium text-white flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-slate-400" />
+                Recent Activity
+              </h3>
             </div>
-          )}
+            <div className="flex-1 overflow-y-auto max-h-[400px]">
+              {progress?.recent_activity && progress.recent_activity.length > 0 ? (
+                <div className="divide-y divide-slate-800/50">
+                  {progress.recent_activity.map((item, idx) => (
+                    <div key={idx} className="p-5 hover:bg-[#1a1a24]/50 transition-colors flex items-start gap-4">
+                      <div className="mt-1 w-2 h-2 rounded-full bg-indigo-500/50 ring-4 ring-indigo-500/10 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-200 truncate">{item.action}</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">{item.detail}</p>
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-500 whitespace-nowrap">
+                        {item.timestamp}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500 py-12">
+                  <Activity className="w-8 h-8 mb-3 opacity-20" />
+                  <p className="text-sm">No recent activity recorded.</p>
+                  <p className="text-xs mt-1 opacity-60">Start studying to see your history.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

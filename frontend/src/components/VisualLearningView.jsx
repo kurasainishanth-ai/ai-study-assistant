@@ -6,10 +6,7 @@ import {
   Loader2,
   Eye,
   Paintbrush,
-  HelpCircle,
-  CheckCircle,
   FileImage,
-  Layers
 } from 'lucide-react';
 import { api } from '../services/api';
 import MarkdownView from './MarkdownView';
@@ -73,227 +70,246 @@ export default function VisualLearningView({
 
   if (!activeDoc) {
     return (
-      <div className="p-12 max-w-lg mx-auto text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
-          <ImageIcon className="w-8 h-8" />
+      <div className="h-full flex items-center justify-center p-8 bg-[#0a0a0f]">
+        <div className="max-w-md w-full text-center space-y-6 bg-[#141419] border border-slate-800/50 p-10 rounded-3xl">
+          <div className="w-20 h-20 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto text-slate-500 border border-slate-700/50">
+            <ImageIcon className="w-10 h-10" />
+          </div>
+          <div>
+            <h3 className="text-lg font-medium text-white tracking-tight">No Document Selected</h3>
+            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+              Select or upload a study document to enable the Multimodal Visual Learning Studio.
+            </p>
+          </div>
+          <button 
+            onClick={() => onNavigateTab('library')} 
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors"
+          >
+            Go to My Library
+          </button>
         </div>
-        <h3 className="text-base font-bold text-white">No Document Selected</h3>
-        <p className="text-xs text-slate-400">
-          Please select or upload a study document to use Visual Learning.
-        </p>
-        <button onClick={() => onNavigateTab('library')} className="btn btn-primary text-xs">
-          Go to My Library
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
-      {/* Header and Sub-tabs */}
-      <div className="glass-card p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+    <div className="min-h-full bg-[#0a0a0f] py-8 px-4 sm:px-8 text-slate-300">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-slate-800/50">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-violet-400" />
-              Multimodal Visual Learning Studio
+            <h2 className="text-2xl font-semibold text-white tracking-tight flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-indigo-400" />
+              Visual Learning Studio
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-sm text-slate-400 mt-2 max-w-xl leading-relaxed">
               Grounded visual comprehension with Gemini Vision & AI concept art with Imagen.
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center p-1 bg-[#141419] rounded-xl border border-slate-800/50">
             <button
               onClick={() => setActiveTab('explain')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
                 activeTab === 'explain'
-                  ? 'bg-violet-600 text-white shadow'
+                  ? 'bg-slate-800 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Eye className="w-3.5 h-3.5" />
-              <span>Diagram Breakdown (Vision)</span>
+              <Eye className="w-4 h-4" />
+              Diagram Breakdown
             </button>
             <button
               onClick={() => setActiveTab('generate')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${
                 activeTab === 'generate'
-                  ? 'bg-violet-600 text-white shadow'
+                  ? 'bg-slate-800 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <Paintbrush className="w-3.5 h-3.5" />
-              <span>Concept Art (Imagen 3)</span>
+              <Paintbrush className="w-4 h-4" />
+              Concept Art
             </button>
           </div>
         </div>
 
         {errorMsg && (
-          <div className="bg-rose-950/80 border border-rose-800 text-rose-200 px-4 py-2.5 rounded-xl text-xs">
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-400">
             {errorMsg}
           </div>
         )}
-      </div>
 
-      {/* Tab 1: Diagram Breakdown */}
-      {activeTab === 'explain' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Uploader Column */}
-          <div className="glass-card p-6 space-y-4 flex flex-col justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
-                <FileImage className="w-4 h-4 text-cyan-400" />
-                Upload Course Diagram or Chart
-              </h3>
-              <p className="text-xs text-slate-400 mb-4">
-                Upload a figure from lecture slides or textbook for deep visual analysis.
-              </p>
+        {/* Tab Content: Explain */}
+        {activeTab === 'explain' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* Left Col: Upload */}
+            <div className="lg:col-span-5 space-y-6">
+              <div className="bg-[#141419] rounded-2xl border border-slate-800/50 p-6 flex flex-col h-full">
+                <div className="mb-6">
+                  <h3 className="text-base font-medium text-white flex items-center gap-2">
+                    <FileImage className="w-5 h-5 text-indigo-400" />
+                    Upload Diagram
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Upload a figure from lecture slides or a textbook.
+                  </p>
+                </div>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files[0]) {
-                    handleSelectDiagram(e.target.files[0]);
-                  }
-                }}
-              />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleSelectDiagram(e.target.files[0]);
+                    }
+                  }}
+                />
 
-              {previewUrl ? (
-                <div className="relative rounded-xl overflow-hidden border border-slate-700 bg-slate-950 max-h-64 flex items-center justify-center p-2">
-                  <img
-                    src={previewUrl}
-                    alt="Diagram Preview"
-                    className="max-h-60 max-w-full object-contain rounded-lg"
-                  />
+                <div className="flex-1 flex flex-col justify-center mb-6">
+                  {previewUrl ? (
+                    <div className="group relative rounded-xl overflow-hidden bg-[#0a0a0f] border border-slate-800 flex items-center justify-center p-2 min-h-[240px]">
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="max-h-64 max-w-full object-contain rounded-lg"
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-sm font-medium rounded-lg backdrop-blur-sm border border-white/10 transition-colors"
+                        >
+                          Change Image
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-700/50 rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all min-h-[240px]"
+                    >
+                      <Upload className="w-8 h-8 text-slate-500 mb-3" />
+                      <div className="text-sm font-medium text-slate-300">
+                        Click to select image
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">PNG, JPG, WebP</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-slate-300 block mb-2">
+                      Specific Question (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={diagramQuestion}
+                      onChange={(e) => setDiagramQuestion(e.target.value)}
+                      placeholder="e.g. What do the blue arrows represent?"
+                      className="w-full bg-[#0a0a0f] text-sm text-white border border-slate-800 rounded-xl px-4 py-3 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-all placeholder-slate-600"
+                    />
+                  </div>
+
                   <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-2 right-2 bg-slate-900/90 text-white text-[10px] px-2 py-1 rounded border border-slate-700 hover:bg-violet-600 transition"
+                    onClick={handleExplain}
+                    disabled={!diagramFile || isExplaining}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   >
-                    Change Image
+                    {isExplaining ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Analyzing with Gemini Vision...
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4" />
+                        Explain Diagram
+                      </>
+                    )}
                   </button>
                 </div>
-              ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-700 rounded-xl p-8 text-center cursor-pointer hover:border-violet-500 bg-slate-900/40 transition"
-                >
-                  <Upload className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                  <div className="text-xs font-semibold text-slate-300">
-                    Click to select diagram image
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">PNG, JPG, WebP</div>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <label className="text-xs font-semibold text-slate-300 block mb-1">
-                  Specific Question (Optional):
-                </label>
-                <input
-                  type="text"
-                  value={diagramQuestion}
-                  onChange={(e) => setDiagramQuestion(e.target.value)}
-                  placeholder="e.g. What do the blue arrows represent? Or explain step 3"
-                  className="w-full bg-slate-950 text-xs text-white border border-slate-800 rounded-xl p-2.5 outline-none focus:border-violet-500"
-                />
               </div>
             </div>
 
-            <button
-              onClick={handleExplain}
-              disabled={!diagramFile || isExplaining}
-              className="btn btn-primary text-xs py-2.5 w-full mt-4 flex items-center justify-center gap-2"
-            >
-              {isExplaining ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Analyzing with Gemini Vision...</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Explain Diagram</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Breakdown Results Column */}
-          <div className="glass-card p-6 flex flex-col">
-            <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-violet-400" />
-              AI Visual Breakdown
-            </h3>
-
-            {explanationResult ? (
-              <div className="flex-1 overflow-y-auto max-h-[500px] bg-slate-900/60 p-4 rounded-xl border border-slate-800">
-                <MarkdownView content={explanationResult} />
+            {/* Right Col: Result */}
+            <div className="lg:col-span-7">
+              <div className="bg-[#141419] rounded-2xl border border-slate-800/50 flex flex-col h-full overflow-hidden">
+                <div className="p-4 border-b border-slate-800/50 bg-[#141419]/80 backdrop-blur">
+                  <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    AI Breakdown
+                  </h3>
+                </div>
+                
+                {explanationResult ? (
+                  <div className="p-6 flex-1 overflow-y-auto bg-[#0a0a0f]/50 prose prose-invert prose-slate max-w-none prose-p:leading-relaxed prose-headings:text-slate-200">
+                    <MarkdownView content={explanationResult} />
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-12 text-slate-500 bg-[#0a0a0f]/20">
+                    <ImageIcon className="w-12 h-12 mb-4 opacity-20" />
+                    <p className="text-sm text-center max-w-xs leading-relaxed">
+                      Upload a diagram and click "Explain Diagram" to get a structured step-by-step breakdown.
+                    </p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500">
-                <ImageIcon className="w-10 h-10 mb-2 opacity-40" />
-                <p className="text-xs">
-                  Upload a diagram and click "Explain Diagram" to see a structured step-by-step breakdown.
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content: Generate */}
+        {activeTab === 'generate' && (
+          <div className="bg-[#141419] rounded-2xl border border-slate-800/50 p-6 sm:p-10">
+            <div className="max-w-2xl mx-auto space-y-8">
+              
+              <div className="space-y-4 text-center">
+                <h3 className="text-lg font-medium text-white">Generate Concept Art</h3>
+                <p className="text-sm text-slate-400">
+                  Powered by Google Imagen 3. Describe a study concept to visualize it.
                 </p>
               </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* Tab 2: Concept Art (Imagen 3) */}
-      {activeTab === 'generate' && (
-        <div className="glass-card p-6 space-y-6">
-          <div className="max-w-xl mx-auto space-y-3">
-            <label className="text-xs font-semibold text-slate-300 block">
-              Describe the study concept you want to visualize:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={artPrompt}
-                onChange={(e) => setArtPrompt(e.target.value)}
-                placeholder="e.g. A 3D educational isometric diagram illustrating photosynthesis in plant cells"
-                className="flex-1 bg-slate-950 text-xs text-white border border-slate-800 rounded-xl p-3 outline-none focus:border-violet-500"
-              />
-              <button
-                onClick={handleGenerateArt}
-                disabled={!artPrompt.trim() || isGeneratingArt}
-                className="btn btn-primary text-xs py-2 px-5 flex items-center gap-1.5 shrink-0"
-              >
-                {isGeneratingArt ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Rendering...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Generate Art</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-500">
-              Powered by Google Imagen 3. Generates high-fidelity visual study aids.
-            </p>
-          </div>
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={artPrompt}
+                  onChange={(e) => setArtPrompt(e.target.value)}
+                  placeholder="e.g. A 3D educational isometric diagram illustrating photosynthesis"
+                  className="w-full bg-[#0a0a0f] text-sm text-white border border-slate-800 rounded-2xl pl-5 pr-36 py-4 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-all placeholder-slate-600 shadow-sm"
+                />
+                <button
+                  onClick={handleGenerateArt}
+                  disabled={!artPrompt.trim() || isGeneratingArt}
+                  className="absolute right-2 top-2 bottom-2 px-6 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  {isGeneratingArt ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Paintbrush className="w-4 h-4" />
+                  )}
+                  {isGeneratingArt ? 'Rendering' : 'Generate'}
+                </button>
+              </div>
 
-          {artResult && (
-            <div className="max-w-xl mx-auto rounded-2xl overflow-hidden border border-violet-500/40 shadow-2xl p-2 bg-slate-950">
-              <img
-                src={`data:image/png;base64,${artResult}`}
-                alt="Generated concept art"
-                className="w-full h-auto rounded-xl object-contain"
-              />
+              {artResult && (
+                <div className="mt-8 rounded-2xl overflow-hidden border border-slate-800 bg-[#0a0a0f] p-4 shadow-2xl">
+                  <img
+                    src={`data:image/png;base64,${artResult}`}
+                    alt="Generated concept art"
+                    className="w-full h-auto rounded-xl object-contain shadow-sm mx-auto"
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }

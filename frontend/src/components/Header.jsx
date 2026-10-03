@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, AlertCircle } from 'lucide-react';
+import { Upload, AlertCircle, Menu } from 'lucide-react';
 
 const TAB_TITLES = {
   dashboard: 'Dashboard',
@@ -20,7 +20,8 @@ export default function Header({
   streakDays = 1,
   onUploadClick,
   errorMessage,
-  onClearError
+  onClearError,
+  onMenuClick
 }) {
   const title = TAB_TITLES[activeTab] || 'StudyVerse';
 
@@ -37,7 +38,15 @@ export default function Header({
       )}
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white tracking-tight">{title}</h1>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onMenuClick}
+            className="lg:hidden text-slate-400 hover:text-white p-1 -ml-1 transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">{title}</h1>
+        </div>
 
         <div className="flex items-center gap-4">
           {activeDoc && (

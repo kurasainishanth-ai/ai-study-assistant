@@ -8,7 +8,8 @@ import {
   ArrowRight,
   BookOpen,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -48,17 +49,24 @@ export default function KnowledgeMapView({
 
   if (!activeDoc) {
     return (
-      <div className="p-12 max-w-lg mx-auto text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
-          <Network className="w-8 h-8" />
+      <div className="h-full flex items-center justify-center p-8 bg-[#0a0a0f]">
+        <div className="max-w-md w-full text-center space-y-6 bg-[#141419] border border-slate-800/50 p-10 rounded-3xl">
+          <div className="w-20 h-20 rounded-2xl bg-slate-800/50 flex items-center justify-center mx-auto text-slate-500 border border-slate-700/50">
+            <Network className="w-10 h-10" />
+          </div>
+          <div>
+            <h3 className="text-lg font-medium text-white tracking-tight">No Document Selected</h3>
+            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+              Select or upload a study document to build and visualize your Knowledge Map.
+            </p>
+          </div>
+          <button 
+            onClick={() => onNavigateTab('library')} 
+            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors"
+          >
+            Go to My Library
+          </button>
         </div>
-        <h3 className="text-base font-bold text-white">No Document Selected</h3>
-        <p className="text-xs text-slate-400">
-          Please select or upload a study document to build your Knowledge Map.
-        </p>
-        <button onClick={() => onNavigateTab('library')} className="btn btn-primary text-xs">
-          Go to My Library
-        </button>
       </div>
     );
   }
@@ -66,171 +74,213 @@ export default function KnowledgeMapView({
   const topics = mapData?.topics || [];
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="glass-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <Network className="w-4 h-4 text-violet-400" />
-            Knowledge Map & Dependency Graph
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Hierarchical concept nodes grounded in <span className="text-slate-200 font-medium">{activeDoc.name}</span>
-          </p>
+    <div className="min-h-full bg-[#0a0a0f] py-8 px-4 sm:px-8 text-slate-300">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-slate-800/50">
+          <div>
+            <h2 className="text-2xl font-semibold text-white tracking-tight flex items-center gap-2">
+              <Network className="w-6 h-6 text-indigo-400" />
+              Knowledge Map
+            </h2>
+            <p className="text-sm text-slate-400 mt-2 flex items-center gap-2">
+              Hierarchical concepts grounded in 
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#141419] border border-slate-800 text-slate-200 text-xs font-medium">
+                <BookOpen className="w-3.5 h-3.5 text-slate-500" />
+                {activeDoc.name}
+              </span>
+            </p>
+          </div>
+
+          <button
+            onClick={() => loadKnowledgeMap(activeDoc.id)}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#141419] hover:bg-[#1a1a24] border border-slate-800/50 rounded-lg text-sm font-medium text-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Regenerate Map
+          </button>
         </div>
 
-        <button
-          onClick={() => loadKnowledgeMap(activeDoc.id)}
-          disabled={isLoading}
-          className="btn btn-secondary text-xs py-2 px-3.5 flex items-center gap-1.5"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>Regenerate Map</span>
-        </button>
-      </div>
+        {errorMsg && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-400 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5" />
+            {errorMsg}
+          </div>
+        )}
 
-      {errorMsg && (
-        <div className="bg-rose-950/80 border border-rose-800 text-rose-200 px-4 py-2.5 rounded-xl text-xs">
-          {errorMsg}
-        </div>
-      )}
+        {isLoading ? (
+          <div className="bg-[#141419] border border-slate-800/50 rounded-3xl p-20 flex flex-col items-center justify-center text-center space-y-4">
+            <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+            <h4 className="text-base font-medium text-white">Synthesizing Relationships...</h4>
+            <p className="text-sm text-slate-400 max-w-sm">
+              Analyzing prerequisites, core themes, and mastery states from your material.
+            </p>
+          </div>
+        ) : topics.length === 0 ? (
+          <div className="bg-[#141419] border border-slate-800/50 rounded-3xl p-20 flex flex-col items-center justify-center text-center space-y-4">
+            <Network className="w-12 h-12 text-slate-600" />
+            <h4 className="text-base font-medium text-white">No Knowledge Graph Available</h4>
+            <p className="text-sm text-slate-400 max-w-sm">
+              Click "Regenerate Map" to extract topic dependencies and conceptual branches.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* Left Col: Topic Grid */}
+            <div className="lg:col-span-8 flex flex-col">
+              <div className="bg-[#141419] border border-slate-800/50 rounded-2xl flex-1 flex flex-col overflow-hidden h-[600px]">
+                <div className="p-4 border-b border-slate-800/50 bg-[#1a1a24]/50 flex items-center justify-between">
+                  <span className="text-sm font-medium text-white">Concepts Identified: {topics.length}</span>
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5" />
+                    Click a node to inspect
+                  </span>
+                </div>
+                
+                <div className="p-6 overflow-y-auto flex-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {topics.map((node) => {
+                      const isSelected = selectedNode?.name === node.name;
+                      const isReviewNeeded = node.status === 'review_needed';
 
-      {isLoading ? (
-        <div className="glass-card p-16 text-center space-y-3">
-          <Loader2 className="w-8 h-8 text-violet-400 animate-spin mx-auto" />
-          <h4 className="text-sm font-semibold text-white">Synthesizing Topic Relationships...</h4>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Gemini is analyzing prerequisites, core themes, and mastery states from your material.
-          </p>
-        </div>
-      ) : topics.length === 0 ? (
-        <div className="glass-card p-12 text-center space-y-3">
-          <Network className="w-10 h-10 text-slate-500 mx-auto" />
-          <h4 className="text-sm font-semibold text-slate-300">No Knowledge Graph Available</h4>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Click "Regenerate Map" to extract topic dependencies and conceptual branches.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Nodes Visualizer Grid */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="glass-card p-6 space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
-                <span>Concepts Identified: {topics.length}</span>
-                <span className="text-[11px] text-slate-500">Click a node to inspect details</span>
+                      return (
+                        <div
+                          key={node.name}
+                          onClick={() => setSelectedNode(node)}
+                          className={`p-5 rounded-xl border cursor-pointer transition-all flex flex-col ${
+                            isSelected
+                              ? 'bg-indigo-500/10 border-indigo-500/50 ring-1 ring-indigo-500/20'
+                              : 'bg-[#0a0a0f] border-slate-800/80 hover:border-slate-700 hover:bg-[#1a1a24]'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <h4 className="text-sm font-medium text-slate-200 leading-snug">
+                              {node.name}
+                            </h4>
+                            <span
+                              className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${
+                                isReviewNeeded 
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              }`}
+                            >
+                              {isReviewNeeded ? 'Review Needed' : 'Grounded'}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed flex-1">
+                            {node.summary || 'Core concept extracted from course document.'}
+                          </p>
+
+                          {node.dependencies && node.dependencies.length > 0 && (
+                            <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-start gap-2">
+                              <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider shrink-0 mt-0.5">Builds on</span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {node.dependencies.slice(0, 2).map((dep, idx) => (
+                                  <span key={idx} className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">
+                                    {dep}
+                                  </span>
+                                ))}
+                                {node.dependencies.length > 2 && (
+                                  <span className="text-[10px] text-slate-500">+{node.dependencies.length - 2} more</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {topics.map((node) => {
-                  const isSelected = selectedNode?.name === node.name;
-                  const isReviewNeeded = node.status === 'review_needed';
+            {/* Right Col: Inspector */}
+            <div className="lg:col-span-4 flex flex-col">
+              <div className="bg-[#141419] border border-slate-800/50 rounded-2xl flex-1 flex flex-col h-[600px]">
+                <div className="p-4 border-b border-slate-800/50 bg-[#1a1a24]/50">
+                  <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    Inspector Panel
+                  </h3>
+                </div>
 
-                  return (
-                    <div
-                      key={node.name}
-                      onClick={() => setSelectedNode(node)}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                        isSelected
-                          ? 'bg-violet-950/40 border-violet-500 shadow-md shadow-violet-500/20'
-                          : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900'
-                      }`}
-                    >
+                <div className="p-6 flex-1 flex flex-col overflow-y-auto">
+                  {selectedNode ? (
+                    <div className="space-y-6 flex-1">
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                            {node.name}
-                          </span>
-                          <span
-                            className={`badge text-[9px] ${
-                              isReviewNeeded ? 'badge-amber' : 'badge-emerald'
-                            }`}
-                          >
-                            {isReviewNeeded ? 'Review Needed' : 'Grounded'}
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-500/10 text-indigo-400 text-xs font-medium mb-3">
+                          <Network className="w-3.5 h-3.5" /> Topic
+                        </div>
+                        <h3 className="text-xl font-semibold text-white leading-tight mb-2">
+                          {selectedNode.name}
+                        </h3>
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-slate-500">Status:</span>
+                          <span className={`font-medium ${selectedNode.status === 'review_needed' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {selectedNode.status === 'review_needed' ? 'Target for Review' : 'Concept Grounded'}
                           </span>
                         </div>
-
-                        <p className="text-[11px] text-slate-400 line-clamp-2">
-                          {node.summary || 'Core concept extracted from course document.'}
-                        </p>
                       </div>
 
-                      {node.dependencies && node.dependencies.length > 0 && (
-                        <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center gap-1 text-[10px] text-slate-500 truncate">
-                          <span>Builds upon: </span>
-                          <span className="text-cyan-400 truncate">
-                            {node.dependencies.join(', ')}
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Summary</h4>
+                        <div className="bg-[#0a0a0f] border border-slate-800/50 p-4 rounded-xl">
+                          <p className="text-sm text-slate-300 leading-relaxed">
+                            {selectedNode.summary || 'Detailed summary extracted from material.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {selectedNode.dependencies && selectedNode.dependencies.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Prerequisites</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedNode.dependencies.map((dep, dIdx) => (
+                              <span key={dIdx} className="px-2.5 py-1 bg-[#0a0a0f] border border-slate-700/50 text-slate-300 text-xs rounded-lg">
+                                {dep}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedNode.citation && (
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Source</h4>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-800/50 text-slate-300 text-xs rounded-lg font-mono">
+                            📍 {selectedNode.citation}
                           </span>
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Node Inspector Panel */}
-          <div className="glass-card p-6 flex flex-col justify-between">
-            {selectedNode ? (
-              <div className="space-y-4">
-                <div className="border-b border-slate-800/80 pb-3">
-                  <span className="badge badge-purple text-[10px] mb-2">Topic Inspector</span>
-                  <h3 className="text-base font-bold text-white">{selectedNode.name}</h3>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Status:{' '}
-                    <span className="font-semibold text-emerald-400">
-                      {selectedNode.status === 'review_needed' ? 'Target for Review' : 'Concept Grounded'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-slate-300">Concept Summary:</div>
-                  <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                    {selectedNode.summary || 'Detailed summary extracted from material.'}
-                  </p>
-                </div>
-
-                {selectedNode.dependencies && selectedNode.dependencies.length > 0 && (
-                  <div className="space-y-1.5">
-                    <div className="text-xs font-semibold text-slate-300">Prerequisites / Connections:</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedNode.dependencies.map((dep, dIdx) => (
-                        <span key={dIdx} className="badge badge-cyan text-[10px]">
-                          {dep}
-                        </span>
-                      ))}
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-500 py-12 text-center">
+                      <Network className="w-12 h-12 mb-4 opacity-20" />
+                      <p className="text-sm">Select a topic node from the map to view its properties and relationships.</p>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {selectedNode.citation && (
-                  <div className="text-xs text-slate-400">
-                    <span className="font-semibold">Source Location: </span>
-                    <span className="citation-pill text-[10px]">📍 {selectedNode.citation}</span>
+                  <div className="mt-6 pt-6 border-t border-slate-800/50">
+                    <button
+                      onClick={() => onNavigateTab('quiz')}
+                      className="w-full py-3 bg-white hover:bg-slate-200 text-slate-900 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                      disabled={!selectedNode}
+                    >
+                      Test Topic Knowledge
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
-            ) : (
-              <div className="text-center text-slate-500 py-12">
-                <p className="text-xs">Select any topic node to inspect its details and prerequisites.</p>
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-slate-800 flex gap-2">
-              <button
-                onClick={() => onNavigateTab('quiz')}
-                className="btn btn-secondary text-xs flex-1 flex items-center justify-center gap-1.5"
-              >
-                <span>Test Topic</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
             </div>
+            
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

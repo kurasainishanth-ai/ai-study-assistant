@@ -5,11 +5,9 @@ import {
   User,
   Trash2,
   Sparkles,
-  BookOpen,
   Loader2,
   GraduationCap,
   Lightbulb,
-  FileQuestion
 } from 'lucide-react';
 import { api } from '../services/api';
 import MarkdownView from './MarkdownView';
@@ -31,6 +29,7 @@ export default function AITutorView({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const chatBottomRef = useRef(null);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
     if (activeDoc) {
@@ -44,10 +43,29 @@ export default function AITutorView({
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [inputText]);
+
   const loadChatHistory = async (docId) => {
     try {
       const history = await api.getTutorHistory(docId);
-      setMessages(history || []);
+      // Clean up potential JSON strings in history
+      const cleanedHistory = (history || []).map(msg => {
+        if (msg.role === 'assistant' && typeof msg.content === 'string') {
+          try {
+            const parsed = JSON.parse(msg.content);
+            if (parsed.content || parsed.response || parsed.answer) {
+              msg.content = parsed.content || parsed.response || parsed.answer || msg.content;
+            }
+          } catch(e) {}
+        }
+        return msg;
+      });
+      setMessages(cleanedHistory);
     } catch (err) {
       console.error('Failed to load chat history:', err);
     }
@@ -60,7 +78,6 @@ export default function AITutorView({
     setInputText('');
     setErrorMsg(null);
 
-    // Optimistic user message
     const userMsg = {
       role: 'user',
       content: text,
@@ -71,9 +88,20 @@ export default function AITutorView({
 
     try {
       const response = await api.askTutor(activeDoc.id, text, level);
+      
+      let finalContent = response.content || response.response || '';
+      if (typeof finalContent === 'string') {
+        try {
+          const parsed = JSON.parse(finalContent);
+          finalContent = parsed.content || parsed.response || parsed.answer || finalContent;
+        } catch(e) {}
+      } else if (typeof finalContent === 'object') {
+          finalContent = finalContent.content || finalContent.response || finalContent.answer || JSON.stringify(finalContent);
+      }
+
       const assistantMsg = {
         role: 'assistant',
-        content: response.content || response.response || '',
+        content: finalContent,
         citations: response.citations || [],
         raw: response.raw_agent_response || null,
         created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -96,17 +124,27 @@ export default function AITutorView({
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   if (!activeDoc) {
     return (
-      <div className="p-12 max-w-lg mx-auto text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
-          <Bot className="w-8 h-8" />
+      <div className="flex-1 flex flex-col items-center justify-center h-full bg-[#0a0a0f] text-slate-300 p-8">
+        <div className="w-16 h-16 rounded-2xl bg-[#141419] border border-slate-800/50 flex items-center justify-center mb-6 shadow-sm">
+          <Bot className="w-8 h-8 text-slate-400" />
         </div>
-        <h3 className="text-base font-bold text-white">No Document Selected</h3>
-        <p className="text-xs text-slate-400">
+        <h3 className="text-xl font-medium text-white mb-2">No Document Selected</h3>
+        <p className="text-sm text-slate-400 mb-6 max-w-sm text-center leading-relaxed">
           Please select or upload a document to interact with your Grounded AI Tutor.
         </p>
-        <button onClick={() => onNavigateTab('library')} className="btn btn-primary text-xs">
+        <button 
+          onClick={() => onNavigateTab('library')} 
+          className="px-6 py-2.5 bg-white text-black font-medium rounded-lg hover:bg-slate-200 transition-colors text-sm shadow-sm"
+        >
           Go to My Library
         </button>
       </div>
@@ -114,41 +152,37 @@ export default function AITutorView({
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto flex flex-col h-[calc(100vh-100px)]">
+    <div className="flex flex-col h-[calc(100vh-100px)] bg-[#0a0a0f] text-slate-300 font-sans">
       {/* Top Bar */}
-      <div className="glass-card p-4 mb-4 flex items-center justify-between border-b border-slate-800">
+      <div className="flex-none px-6 py-4 bg-[#141419]/90 backdrop-blur-md border-b border-slate-800/50 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-violet-600 flex items-center justify-center shadow-md">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <span>AI Study Agent</span>
-            </h2>
+            <h2 className="text-sm font-semibold text-white">AI Study Agent</h2>
             <p className="text-xs text-slate-400">
-              Active document: <span className="text-slate-200">{activeDoc.name}</span>
+              Active: <span className="text-slate-200">{activeDoc.name}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Depth / Language Level Selector */}
-          <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded-lg border border-slate-800">
-            <GraduationCap className="w-3.5 h-3.5 text-violet-400" />
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-2 bg-[#0a0a0f] px-3 py-1.5 rounded-lg border border-slate-800/50">
+            <GraduationCap className="w-4 h-4 text-purple-400" />
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value)}
-              className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer"
+              className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none"
             >
               <option value="simple">Simple / ELI5</option>
-              <option value="intermediate">Intermediate (College)</option>
-              <option value="university">University (Deep Rigor)</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="university">University</option>
             </select>
           </div>
-
           <button
             onClick={handleClearHistory}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800"
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-[#2a2a35] transition-colors"
             title="Clear Chat History"
           >
             <Trash2 className="w-4 h-4" />
@@ -157,138 +191,133 @@ export default function AITutorView({
       </div>
 
       {errorMsg && (
-        <div className="bg-rose-950/80 border border-rose-800 text-rose-200 px-4 py-2 rounded-xl text-xs mb-3">
-          {errorMsg}
+        <div className="mx-6 mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm flex items-center gap-2">
+          <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Messages Stream */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto w-full flex flex-col items-center">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-cyan-400 shadow-xl">
-              <Sparkles className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">Ask your AI Study Agent</h3>
-              <p className="text-xs text-slate-400 max-w-md mt-1">
+          <div className="flex-1 w-full max-w-4xl flex flex-col items-center justify-center p-8 text-center">
+             <div className="w-16 h-16 rounded-2xl bg-[#141419] border border-slate-800/50 flex items-center justify-center mb-6 shadow-sm">
+                <Sparkles className="w-8 h-8 text-purple-400" />
+             </div>
+             <h3 className="text-xl font-medium text-white mb-2">How can I help you study?</h3>
+             <p className="text-sm text-slate-400 mb-8 max-w-md leading-relaxed">
                 Ask questions about your study materials, get explanations, generate quizzes, or explore academic topics.
-              </p>
-            </div>
-
-            {/* Prompt Starters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-lg w-full pt-3">
-              {SUGGESTED_PROMPTS.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSendMessage(prompt)}
-                  className="text-left text-xs bg-slate-900/80 hover:bg-violet-950/40 p-3 rounded-xl border border-slate-800 hover:border-violet-500/50 text-slate-300 transition flex items-start gap-2"
-                >
-                  <Lightbulb className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
-                  <span>{prompt}</span>
-                </button>
-              ))}
-            </div>
+             </p>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl">
+               {SUGGESTED_PROMPTS.map((prompt, i) => (
+                 <button
+                   key={i}
+                   onClick={() => handleSendMessage(prompt)}
+                   className="text-left p-4 rounded-xl bg-[#141419] border border-slate-800/50 hover:bg-[#1a1a24] hover:border-slate-700 transition-all group flex items-start gap-3 shadow-sm"
+                 >
+                   <Lightbulb className="w-5 h-5 text-purple-400/70 group-hover:text-purple-400 shrink-0 mt-0.5" />
+                   <span className="text-sm text-slate-300 group-hover:text-white leading-relaxed">{prompt}</span>
+                 </button>
+               ))}
+             </div>
           </div>
         ) : (
-          messages.map((msg, idx) => {
-            const isUser = msg.role === 'user';
-            return (
-              <div
-                key={idx}
-                className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
-              >
-                {!isUser && (
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shrink-0 mt-1 shadow-md shadow-violet-500/20">
-                    <Bot className="w-4 h-4" />
+          <div className="w-full max-w-4xl flex flex-col px-4 py-8 gap-8">
+            {messages.map((msg, idx) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div key={idx} className={`flex gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'} w-full`}>
+                  {/* Avatar */}
+                  <div className="flex-shrink-0">
+                    {isUser ? (
+                      <div className="w-8 h-8 rounded-full bg-[#2a2a35] flex items-center justify-center text-slate-300 shadow-sm border border-slate-700/50">
+                        <User className="w-4 h-4" />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-sm">
+                        <Bot className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
-                )}
 
-                <div
-                  className={`max-w-2xl rounded-2xl p-4 text-xs ${
-                    isUser
-                      ? 'bg-violet-600 text-white rounded-br-xs shadow-lg'
-                      : 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-bl-xs shadow-md'
-                  }`}
-                >
-                  {isUser ? (
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  ) : (
-                    <div>
-                      <MarkdownView content={msg.content} />
-
-                      {msg.citations && msg.citations.length > 0 && (
-                        <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] text-slate-400 font-semibold">
-                            Source Citations:
-                          </span>
-                          {msg.citations.map((cite, cIdx) => (
-                            <span key={cIdx} className="citation-pill text-[10px]">
-                              📍 {cite}
-                            </span>
-                          ))}
+                  {/* Message Content */}
+                  <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[75%]`}>
+                    <div className={`
+                      px-5 py-3.5 rounded-2xl text-sm leading-relaxed shadow-sm
+                      ${isUser 
+                        ? 'bg-[#2a2a35] text-white rounded-tr-sm border border-slate-700/50' 
+                        : 'text-slate-200 bg-transparent'}
+                    `}>
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      ) : (
+                        <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-[#141419] prose-pre:border prose-pre:border-slate-800/50 text-slate-200">
+                          <MarkdownView content={msg.content} />
                         </div>
                       )}
                     </div>
-                  )}
-
-                  <div
-                    className={`text-[9px] mt-1.5 ${
-                      isUser ? 'text-violet-200 text-right' : 'text-slate-500'
-                    }`}
-                  >
-                    {msg.created_at || 'Just now'}
+                    
+                    {!isUser && msg.citations?.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2 px-2">
+                        {msg.citations.map((cite, cIdx) => (
+                          <span key={cIdx} className="text-xs bg-[#141419] border border-slate-800/50 text-slate-400 px-2.5 py-1 rounded-md flex items-center gap-1 shadow-sm">
+                            <span className="text-purple-400">📍</span> {cite}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
+              );
+            })}
 
-                {isUser && (
-                  <div className="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 shrink-0 mt-1">
-                    <User className="w-4 h-4" />
+            {isLoading && (
+              <div className="flex gap-4 flex-row w-full">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-sm">
+                  <Bot className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col items-start max-w-[85%] md:max-w-[75%] pt-2">
+                  <div className="flex items-center gap-1.5 px-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                )}
+                </div>
               </div>
-            );
-          })
-        )}
-
-        {isLoading && (
-          <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shrink-0 mt-1 animate-pulse">
-              <Bot className="w-4 h-4" />
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl rounded-bl-xs text-xs text-slate-400 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
-              <span>Thinking...</span>
-            </div>
+            )}
+            <div ref={chatBottomRef} className="h-4" />
           </div>
         )}
-
-        <div ref={chatBottomRef} />
       </div>
 
-      {/* Input Form */}
-      <div className="glass-panel p-3 rounded-2xl border border-slate-800 flex items-center gap-2">
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSendMessage();
-            }
-          }}
-          placeholder={`Ask me anything...`}
-          className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 px-3 py-2 outline-none"
-        />
-        <button
-          onClick={() => handleSendMessage()}
-          disabled={!inputText.trim() || isLoading}
-          className="btn btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
-        >
-          <span>Send</span>
-          <Send className="w-3.5 h-3.5" />
-        </button>
+      {/* Input Area */}
+      <div className="flex-none p-4 w-full max-w-4xl mx-auto mb-2 bg-[#0a0a0f]">
+        <div className="relative bg-[#141419] border border-slate-800/50 rounded-2xl shadow-lg focus-within:border-slate-600 focus-within:ring-1 focus-within:ring-slate-600 transition-all flex items-end min-h-[60px] p-2">
+          <textarea
+            ref={textareaRef}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Message AI Study Agent..."
+            className="flex-1 max-h-48 min-h-[44px] bg-transparent text-sm text-white placeholder-slate-500 px-3 py-3 outline-none resize-none overflow-y-auto leading-relaxed"
+            rows={1}
+            style={{ height: '44px' }}
+          />
+          <button
+            onClick={() => handleSendMessage()}
+            disabled={!inputText.trim() || isLoading}
+            className={`
+              p-2.5 rounded-xl mb-1 mr-1 flex items-center justify-center transition-colors shadow-sm
+              ${!inputText.trim() || isLoading 
+                ? 'bg-[#2a2a35] text-slate-500 cursor-not-allowed' 
+                : 'bg-white text-black hover:bg-slate-200'}
+            `}
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="text-center mt-3">
+          <p className="text-[11px] text-slate-500">AI can make mistakes. Verify important information.</p>
+        </div>
       </div>
     </div>
   );

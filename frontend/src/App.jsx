@@ -20,6 +20,7 @@ export default function App() {
   const [healthInfo, setHealthInfo] = useState(null);
   const [globalError, setGlobalError] = useState(null);
   const [streakDays, setStreakDays] = useState(1);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -27,14 +28,9 @@ export default function App() {
 
   const loadInitialData = async () => {
     try {
-      // 1. Health check
       const health = await api.getHealth();
       setHealthInfo(health);
-
-      // 2. Load materials
       await refreshMaterials();
-
-      // 3. Load streak / progress
       const prog = await api.getProgressAnalytics();
       if (prog && prog.streak_days) {
         setStreakDays(prog.streak_days);
@@ -49,8 +45,6 @@ export default function App() {
     try {
       const list = await api.getMaterials();
       setMaterials(list || []);
-
-      // If activeDocId is not set or not in list, select first available
       if (list && list.length > 0) {
         if (!activeDocId || !list.some((m) => m.id === activeDocId)) {
           setActiveDocId(list[0].id);
@@ -67,20 +61,34 @@ export default function App() {
   const activeDoc = materials.find((m) => m.id === activeDocId) || null;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0b0f19] text-slate-100 font-sans">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#0a0a0f] text-slate-100 font-sans">
+      
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        materials={materials}
-        activeDocId={activeDocId}
-        setActiveDocId={setActiveDocId}
-        isHealthy={healthInfo?.status === 'healthy'}
-        defaultModel={healthInfo?.configured_model || healthInfo?.default_model || 'gemini-2.5-flash-lite'}
-      />
+      <div className={`fixed lg:static inset-y-0 left-0 z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            setIsSidebarOpen(false); // Close on mobile after nav
+          }}
+          materials={materials}
+          activeDocId={activeDocId}
+          setActiveDocId={setActiveDocId}
+          isHealthy={healthInfo?.status === 'healthy'}
+          defaultModel={healthInfo?.configured_model || healthInfo?.default_model || 'gemini-2.5-flash-lite'}
+        />
+      </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <Header
           activeTab={activeTab}
           activeDoc={activeDoc}
@@ -88,10 +96,11 @@ export default function App() {
           onUploadClick={() => setActiveTab('library')}
           errorMessage={globalError}
           onClearError={() => setGlobalError(null)}
+          onMenuClick={() => setIsSidebarOpen(true)}
         />
 
         {/* Scrollable View Container */}
-        <main className="flex-1 overflow-y-auto bg-[#0b0f19]">
+        <main className="flex-1 overflow-y-auto bg-[#0a0a0f]">
           {activeTab === 'dashboard' && (
             <DashboardView
               materials={materials}

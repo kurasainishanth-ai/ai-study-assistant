@@ -111,17 +111,17 @@ export default function LibraryView({
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto space-y-8">
-      {/* Upload Box */}
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-10">
+      {/* Massive Upload Dropzone */}
       <div
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${
+        className={`relative overflow-hidden border-2 border-dashed rounded-3xl flex flex-col items-center justify-center transition-all duration-300 min-h-[320px] ${
           dragActive
-            ? 'border-violet-500 bg-violet-950/20 scale-[1.005]'
-            : 'border-slate-700/80 bg-slate-900/40 hover:border-slate-600'
+            ? 'border-indigo-500 bg-indigo-500/5 scale-[1.01]'
+            : 'border-slate-800 bg-[#141419]/50 hover:border-slate-600 hover:bg-[#141419]'
         }`}
       >
         <input
@@ -136,273 +136,281 @@ export default function LibraryView({
           }}
         />
 
-        <div className="max-w-md mx-auto space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center mx-auto shadow-lg shadow-violet-500/20">
+        <div className="max-w-lg mx-auto text-center space-y-6 px-6 z-10">
+          <div className="w-20 h-20 rounded-3xl bg-[#0a0a0f] border border-slate-800/80 flex items-center justify-center mx-auto shadow-2xl transition-transform hover:scale-105">
             {isUploading ? (
-              <Loader2 className="w-7 h-7 text-white animate-spin" />
+              <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
             ) : (
-              <Upload className="w-7 h-7 text-white" />
+              <Upload className="w-8 h-8 text-slate-400" />
             )}
           </div>
 
           <div>
-            <h3 className="text-base font-bold text-white">
-              {isUploading ? 'Extracting document content...' : 'Upload Study Materials'}
+            <h3 className="text-2xl font-semibold text-white tracking-tight">
+              {isUploading ? 'Extracting knowledge...' : 'Drop your study materials here'}
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              Drag & drop course notes, lecture slides, textbooks or images
+            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
+              Upload course notes, lecture slides, textbooks or images. We'll instantly process them for your AI tutor.
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-1.5 text-[11px] text-slate-400">
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">PDF (.pdf)</span>
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">PowerPoint (.pptx)</span>
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">Word (.docx)</span>
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">Images (.png, .jpg)</span>
-            <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700">Text & Markdown</span>
+          <div className="flex flex-wrap justify-center gap-2 text-xs font-medium text-slate-500">
+            <span className="px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-slate-800">PDF</span>
+            <span className="px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-slate-800">PowerPoint</span>
+            <span className="px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-slate-800">Word</span>
+            <span className="px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-slate-800">Images</span>
+            <span className="px-3 py-1.5 rounded-lg bg-[#0a0a0f] border border-slate-800">Text & Markdown</span>
           </div>
 
-          <div className="pt-2 flex items-center justify-center gap-3">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="btn btn-primary text-xs py-2 px-5"
+              className="bg-white hover:bg-slate-100 disabled:opacity-50 text-slate-900 font-semibold text-sm py-3 px-8 rounded-xl transition-all shadow-md w-full sm:w-auto"
             >
-              Choose File
+              Browse Files
             </button>
-            <span className="text-xs text-slate-500">or</span>
+            <span className="text-sm text-slate-600 font-medium">or</span>
             <button
               onClick={handleLoadSample}
               disabled={isUploading}
-              className="btn btn-secondary text-xs py-2 px-4 flex items-center gap-1.5 hover:text-cyan-300"
+              className="bg-[#0a0a0f] hover:bg-[#111116] border border-slate-800/80 disabled:opacity-50 text-slate-300 font-semibold text-sm py-3 px-6 rounded-xl flex items-center justify-center gap-2 transition-all w-full sm:w-auto"
             >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Load Sample Notes</span>
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span>Load Sample Note</span>
             </button>
           </div>
+        </div>
+        
+        {/* Decorative background gradients */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
+          <div className="absolute -top-[50%] -left-[10%] w-[70%] h-[150%] bg-indigo-500/10 blur-3xl rounded-full" />
+          <div className="absolute top-[20%] -right-[10%] w-[60%] h-[120%] bg-violet-500/10 blur-3xl rounded-full" />
         </div>
       </div>
 
       {actionError && (
-        <div className="bg-rose-950/80 border border-rose-800 text-rose-200 px-4 py-3 rounded-xl text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-          <span>{actionError}</span>
+        <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 px-5 py-4 rounded-2xl text-sm flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <span className="font-medium">{actionError}</span>
         </div>
       )}
 
-      {/* Materials Table */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Materials Bento Grid */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between px-2">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-violet-400" />
-              Course Materials Library
+            <h2 className="text-xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+              <BookOpen className="w-5 h-5 text-indigo-400" />
+              Your Library
             </h2>
-            <p className="text-xs text-slate-400">
-              {materials.length} document{materials.length === 1 ? '' : 's'} stored in local database
+            <p className="text-sm text-slate-400 mt-1">
+              {materials.length} document{materials.length === 1 ? '' : 's'} ready for study
             </p>
           </div>
         </div>
 
         {materials.length === 0 ? (
-          <div className="glass-card p-10 text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
-              <FileText className="w-6 h-6" />
+          <div className="bg-[#141419] border border-slate-800/50 rounded-3xl p-12 text-center space-y-4 shadow-sm">
+            <div className="w-16 h-16 rounded-3xl bg-[#0a0a0f] border border-slate-800/50 flex items-center justify-center mx-auto text-slate-600">
+              <FileText className="w-8 h-8" />
             </div>
-            <h4 className="text-sm font-semibold text-slate-300">Your library is empty</h4>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Upload a PDF lecture, slide deck, or use "Load Sample Notes" above to start learning with StudyVerse AI.
+            <h4 className="text-base font-medium text-white tracking-tight">Your library is empty</h4>
+            <p className="text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+              Upload your first document above to start generating smart notes, flashcards, and quizzes.
             </p>
           </div>
         ) : (
-          <div className="glass-card overflow-hidden">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-semibold">
-                  <th className="py-3 px-4">Document Name</th>
-                  <th className="py-3 px-3">Format</th>
-                  <th className="py-3 px-3">Size</th>
-                  <th className="py-3 px-3">Status</th>
-                  <th className="py-3 px-3">Uploaded</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {materials.map((m) => {
-                  const isActive = m.id === activeDocId;
-                  const isEditing = editingDocId === m.id;
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {materials.map((m) => {
+              const isActive = m.id === activeDocId;
+              const isEditing = editingDocId === m.id;
 
-                  return (
-                    <tr
-                      key={m.id}
-                      className={`hover:bg-slate-800/40 transition-colors ${
-                        isActive ? 'bg-violet-950/20' : ''
-                      }`}
-                    >
-                      <td className="py-3 px-4">
-                        {isEditing ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={renameValue}
-                              onChange={(e) => setRenameValue(e.target.value)}
-                              className="bg-slate-900 border border-violet-500 rounded px-2 py-1 text-xs text-white outline-none w-48"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleRename(m.id)}
-                              className="text-emerald-400 hover:text-emerald-300 font-bold"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingDocId(null)}
-                              className="text-slate-400 hover:text-slate-200"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2.5">
-                            <FileText className={`w-4 h-4 ${isActive ? 'text-violet-400' : 'text-slate-400'}`} />
-                            <span className="font-semibold text-slate-200">{m.name}</span>
-                            {isActive && (
-                              <span className="badge badge-purple text-[9px]">Active</span>
-                            )}
-                          </div>
+              return (
+                <div
+                  key={m.id}
+                  className={`bg-[#141419] border rounded-2xl p-5 flex flex-col justify-between transition-all group ${
+                    isActive ? 'border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.05)]' : 'border-slate-800/80 hover:border-slate-700'
+                  }`}
+                >
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                        isActive ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-[#0a0a0f] border-slate-800 text-slate-400 group-hover:text-slate-300'
+                      }`}>
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {isActive && (
+                          <span className="px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-bold uppercase tracking-wider border border-indigo-500/20">
+                            Active
+                          </span>
                         )}
-                      </td>
-                      <td className="py-3 px-3 text-slate-300">{m.type}</td>
-                      <td className="py-3 px-3 font-mono text-slate-400">{m.size_kb} KB</td>
-                      <td className="py-3 px-3">
                         {m.status === 'Ready' ? (
-                          <span className="badge badge-emerald text-[9px] flex items-center gap-1">
-                            <CheckCircle className="w-2.5 h-2.5" /> Ready
+                          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
+                            <CheckCircle className="w-3 h-3" /> Ready
                           </span>
                         ) : (
-                          <span className="badge badge-rose text-[9px]">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
                             {m.status || 'Processing'}
                           </span>
                         )}
-                      </td>
-                      <td className="py-3 px-3 text-slate-400">{m.upload_time}</td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      </div>
+                    </div>
+
+                    {isEditing ? (
+                      <div className="space-y-3 mb-2">
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          className="w-full bg-[#0a0a0f] border border-indigo-500/50 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 transition-colors"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => setInspectMaterial(m)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-300 hover:bg-slate-800"
-                            title="Inspect extracted text & images"
+                            onClick={() => handleRename(m.id)}
+                            className="flex-1 bg-indigo-500 hover:bg-indigo-400 text-white font-medium text-xs py-2 rounded-lg transition-colors"
                           >
-                            <Eye className="w-4 h-4" />
+                            Save
                           </button>
                           <button
-                            onClick={() => {
-                              setEditingDocId(m.id);
-                              setRenameValue(m.name);
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-violet-300 hover:bg-slate-800"
-                            title="Rename"
+                            onClick={() => setEditingDocId(null)}
+                            className="flex-1 bg-[#0a0a0f] hover:bg-[#111116] border border-slate-800 text-slate-300 font-medium text-xs py-2 rounded-lg transition-colors"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          {!isActive && (
-                            <button
-                              onClick={() => setActiveDocId(m.id)}
-                              className="text-[11px] px-2 py-1 rounded bg-slate-800 text-slate-300 hover:bg-violet-600 hover:text-white transition"
-                              title="Set as active material"
-                            >
-                              Select
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDelete(m.id, m.name)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            Cancel
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+                    ) : (
+                      <h3 className="text-base font-semibold text-white mb-2 line-clamp-2 leading-tight pr-2">
+                        {m.name}
+                      </h3>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-slate-800/60 flex flex-col gap-4">
+                    <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span>{m.type}</span>
+                      <span>{m.size_kb} KB</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => setInspectMaterial(m)}
+                          className="w-8 h-8 rounded-lg bg-[#0a0a0f] border border-slate-800 flex items-center justify-center text-slate-400 hover:text-indigo-400 hover:border-indigo-500/30 transition-all"
+                          title="Inspect Extracted Text"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingDocId(m.id);
+                            setRenameValue(m.name);
+                          }}
+                          className="w-8 h-8 rounded-lg bg-[#0a0a0f] border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:border-slate-600 transition-all"
+                          title="Rename Document"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(m.id, m.name)}
+                          className="w-8 h-8 rounded-lg bg-[#0a0a0f] border border-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/5 transition-all"
+                          title="Delete Document"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      {!isActive && (
+                        <button
+                          onClick={() => setActiveDocId(m.id)}
+                          className="bg-white hover:bg-slate-100 text-slate-900 font-semibold text-xs py-1.5 px-4 rounded-lg transition-colors shadow-sm"
+                        >
+                          Study This
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
       {/* Extracted Content Verification Drawer/Modal */}
       {inspectMaterial && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-[#0a0a0f]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#141419] border border-slate-800/80 rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-800/80 flex items-center justify-between bg-[#0a0a0f]/30">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2.5 tracking-tight">
                   <FileCheck className="w-5 h-5 text-emerald-400" />
-                  Extracted Content Verification
+                  Text Extraction View
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Inspect the parsed text that Gemini uses for notes, flashcards, and tutor answers
+                <p className="text-sm text-slate-400 mt-1">
+                  This is the raw knowledge the AI tutor sees.
                 </p>
               </div>
               <button
                 onClick={() => setInspectMaterial(null)}
-                className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
+                className="w-10 h-10 rounded-full bg-[#0a0a0f] border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors flex items-center justify-center"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-5 overflow-y-auto space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
-                  <div className="text-xs text-slate-400">Total Characters</div>
-                  <div className="text-base font-bold text-white font-mono mt-0.5">
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-[#0a0a0f] p-4 rounded-2xl border border-slate-800/80 text-center">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Characters</div>
+                  <div className="text-lg font-bold text-white font-mono">
                     {inspectMaterial.content ? inspectMaterial.content.length.toLocaleString() : 0}
                   </div>
                 </div>
-                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
-                  <div className="text-xs text-slate-400">Format</div>
-                  <div className="text-sm font-semibold text-cyan-400 mt-1 truncate">
+                <div className="bg-[#0a0a0f] p-4 rounded-2xl border border-slate-800/80 text-center">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Format</div>
+                  <div className="text-lg font-bold text-indigo-400 truncate">
                     {inspectMaterial.type}
                   </div>
                 </div>
-                <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
-                  <div className="text-xs text-slate-400">Extraction Status</div>
-                  <div className="text-sm font-semibold text-emerald-400 mt-1">
-                    ✓ Verified
+                <div className="bg-[#0a0a0f] p-4 rounded-2xl border border-slate-800/80 text-center">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</div>
+                  <div className="text-lg font-bold text-emerald-400">
+                    Verified
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-300 mb-1.5 block">
-                  Parsed Text Content:
+                <label className="text-sm font-semibold text-white mb-3 block">
+                  Parsed Text Content
                 </label>
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 max-h-72 overflow-y-auto font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                <div className="bg-[#0a0a0f] p-5 rounded-2xl border border-slate-800/80 max-h-[40vh] overflow-y-auto font-mono text-xs text-slate-400 whitespace-pre-wrap leading-relaxed custom-scrollbar">
                   {inspectMaterial.content || 'No text extracted.'}
                 </div>
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-800 bg-slate-900/60 flex items-center justify-between">
+            <div className="p-6 border-t border-slate-800/80 bg-[#0a0a0f]/30 flex items-center justify-between">
+              <button
+                onClick={() => setInspectMaterial(null)}
+                className="bg-[#0a0a0f] hover:bg-[#111116] border border-slate-800 text-slate-300 font-medium text-sm py-2.5 px-6 rounded-xl transition-colors"
+              >
+                Close Preview
+              </button>
               <button
                 onClick={() => {
                   setActiveDocId(inspectMaterial.id);
                   setInspectMaterial(null);
                   onNavigateTab('notes');
                 }}
-                className="btn btn-primary text-xs flex items-center gap-1.5"
+                className="bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm py-2.5 px-6 rounded-xl flex items-center gap-2 transition-all shadow-sm"
               >
-                <span>Generate Smart Notes</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setInspectMaterial(null)}
-                className="btn btn-secondary text-xs"
-              >
-                Close Preview
+                <span>Generate Notes</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>

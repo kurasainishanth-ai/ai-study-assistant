@@ -7,32 +7,28 @@ import {
   Edit3,
   Check,
   Trash2,
-  RefreshCw,
   Loader2,
   BookOpen,
-  Zap,
-  HelpCircle,
-  Columns,
-  GraduationCap,
+  RotateCcw,
   AlertTriangle,
   Clock,
-  RotateCcw
+  LayoutTemplate
 } from 'lucide-react';
 import { api } from '../services/api';
 import MarkdownView from './MarkdownView';
 
 const STYLES = [
   { key: 'quick', title: 'Quick Overview', desc: 'Fast high-level summary and big picture' },
-  { key: 'bullet', title: 'Bullet Points & Key Takeaways', desc: 'Core facts, key findings, and takeaways' },
-  { key: 'key_concepts', title: 'Key Concepts & Principles', desc: 'Core theory with intuitive analogies' },
-  { key: 'definitions', title: 'Definitions & Glossary', desc: 'Alphabetical terms, definitions, and context' },
-  { key: 'formula_sheet', title: 'Exam Cheat Sheet & Formulas', desc: 'Formulas, equations, rules, and memory hacks' },
-  { key: 'exam_revision', title: 'High-Yield Cram Guide', desc: 'Likely exam traps, edge cases, and must-knows' },
-  { key: 'beginner', title: 'Beginner-Friendly (ELI5)', desc: 'Simplified plain-English explanation' },
+  { key: 'bullet', title: 'Bullet Points', desc: 'Core facts, key findings, and takeaways' },
+  { key: 'key_concepts', title: 'Key Concepts', desc: 'Core theory with intuitive analogies' },
+  { key: 'definitions', title: 'Definitions', desc: 'Alphabetical terms, definitions, and context' },
+  { key: 'formula_sheet', title: 'Formulas', desc: 'Formulas, equations, rules, and memory hacks' },
+  { key: 'exam_revision', title: 'Exam Revision', desc: 'Likely exam traps, edge cases, and must-knows' },
+  { key: 'beginner', title: 'ELI5 (Beginner)', desc: 'Simplified plain-English explanation' },
   { key: 'chapter_wise', title: 'Structured Outline', desc: 'Hierarchical breakdown by topics & sections' },
-  { key: 'comparisons', title: 'Compare & Contrast Matrix', desc: 'Key differences, tradeoffs, and contrasts' },
-  { key: 'questions', title: 'Self-Test Study Questions', desc: 'Questions with hints to test your retention' },
-  { key: 'comprehensive', title: 'Comprehensive Deep Dive', desc: 'Exhaustive textbook-style academic analysis' },
+  { key: 'comparisons', title: 'Comparisons', desc: 'Key differences, tradeoffs, and contrasts' },
+  { key: 'questions', title: 'Study Questions', desc: 'Questions with hints to test your retention' },
+  { key: 'comprehensive', title: 'Comprehensive', desc: 'Exhaustive textbook-style academic analysis' },
 ];
 
 export default function SmartNotesView({
@@ -48,9 +44,8 @@ export default function SmartNotesView({
   const [editContent, setEditContent] = useState('');
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [errorType, setErrorType] = useState(null); // 'rate_limit', 'quota_exhausted', 'high_demand', 'generic'
+  const [errorType, setErrorType] = useState(null);
 
-  // Fetch saved notes whenever active document changes
   useEffect(() => {
     if (activeDoc) {
       loadNotes(activeDoc.id);
@@ -64,10 +59,8 @@ export default function SmartNotesView({
     try {
       const data = await api.getNotes(docId);
       setNotes(data || []);
-      if (data && data.length > 0) {
+      if (data && data.length > 0 && !activeNoteId) {
         setActiveNoteId(data[0].id);
-      } else {
-        setActiveNoteId(null);
       }
     } catch (err) {
       console.error('Failed to load notes:', err);
@@ -87,38 +80,18 @@ export default function SmartNotesView({
       }
     } catch (err) {
       const rawMsg = err.message || 'Note generation failed';
-      if (
-        rawMsg.includes('QUOTA_EXHAUSTED') ||
-        rawMsg.toLowerCase().includes('daily quota') ||
-        rawMsg.toLowerCase().includes('requests per day')
-      ) {
+      if (rawMsg.includes('QUOTA_EXHAUSTED') || rawMsg.toLowerCase().includes('daily quota')) {
         setErrorType('quota_exhausted');
-        setErrorMsg(
-          'Your Google Gemini API daily request quota has been exhausted. Please wait until your daily quota resets in Google AI Studio or switch to a paid API key.'
-        );
-      } else if (
-        rawMsg.includes('RATE_LIMIT') ||
-        rawMsg.includes('429') ||
-        rawMsg.toLowerCase().includes('rate limit')
-      ) {
+        setErrorMsg('Your API daily request quota has been exhausted. Please wait until it resets.');
+      } else if (rawMsg.includes('RATE_LIMIT') || rawMsg.includes('429')) {
         setErrorType('rate_limit');
-        setErrorMsg(
-          'Gemini temporary rate limit reached (requests per minute). Your study material and selected format are preserved below. Please wait a few seconds and click Retry.'
-        );
-      } else if (
-        rawMsg.includes('HIGH_DEMAND') ||
-        rawMsg.includes('503') ||
-        rawMsg.toLowerCase().includes('high demand')
-      ) {
+        setErrorMsg('Temporary rate limit reached. Please wait a few seconds and try again.');
+      } else if (rawMsg.includes('HIGH_DEMAND') || rawMsg.includes('503')) {
         setErrorType('high_demand');
-        setErrorMsg(
-          'Gemini servers are experiencing temporary peak demand (HTTP 503). Your material and settings are preserved. Please wait a moment and try again.'
-        );
-      } else if (rawMsg.includes('409') || rawMsg.toLowerCase().includes('already currently in progress')) {
+        setErrorMsg('Servers are experiencing peak demand. Please wait a moment and try again.');
+      } else if (rawMsg.includes('409') || rawMsg.toLowerCase().includes('in progress')) {
         setErrorType('in_progress');
-        setErrorMsg(
-          'A note generation request is already currently in progress. Please wait for it to complete.'
-        );
+        setErrorMsg('A generation request is already in progress. Please wait.');
       } else {
         setErrorType('generic');
         setErrorMsg(rawMsg);
@@ -158,6 +131,9 @@ export default function SmartNotesView({
     if (!window.confirm('Delete this saved note?')) return;
     try {
       await api.deleteNote(noteId);
+      const remaining = notes.filter(n => n.id !== noteId);
+      if (remaining.length > 0) setActiveNoteId(remaining[0].id);
+      else setActiveNoteId(null);
       await loadNotes(activeDoc.id);
     } catch (err) {
       setErrorMsg(err.message || 'Delete note failed');
@@ -166,17 +142,17 @@ export default function SmartNotesView({
 
   if (!activeDoc) {
     return (
-      <div className="p-12 max-w-lg mx-auto text-center space-y-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
-          <BookOpen className="w-8 h-8" />
+      <div className="flex-1 flex flex-col items-center justify-center h-full bg-[#0a0a0f] text-slate-300 p-8">
+        <div className="w-16 h-16 rounded-2xl bg-[#141419] border border-slate-800/50 flex items-center justify-center mb-6 shadow-sm">
+          <BookOpen className="w-8 h-8 text-slate-400" />
         </div>
-        <h3 className="text-base font-bold text-white">No Document Selected</h3>
-        <p className="text-xs text-slate-400">
+        <h3 className="text-xl font-medium text-white mb-2">No Document Selected</h3>
+        <p className="text-sm text-slate-400 mb-6 max-w-sm text-center leading-relaxed">
           Please select or upload a study document in your library to generate AI Smart Notes.
         </p>
-        <button
-          onClick={() => onNavigateTab('library')}
-          className="btn btn-primary text-xs"
+        <button 
+          onClick={() => onNavigateTab('library')} 
+          className="px-6 py-2.5 bg-white text-black font-medium rounded-lg hover:bg-slate-200 transition-colors text-sm shadow-sm"
         >
           Go to My Library
         </button>
@@ -187,29 +163,76 @@ export default function SmartNotesView({
   const currentNote = notes.find((n) => n.id === activeNoteId);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      {/* Top Generator Form */}
-      <div className="glass-card p-6 space-y-5">
-        <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] bg-[#0a0a0f] text-slate-300 font-sans">
+      
+      {/* Sidebar: Generator Options & Note List */}
+      <div className="w-full md:w-[320px] lg:w-[380px] bg-[#141419] border-r border-slate-800/50 flex flex-col h-full overflow-y-auto">
+        <div className="p-5 border-b border-slate-800/50 sticky top-0 bg-[#141419]/90 backdrop-blur z-10">
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2 mb-1">
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            Generate Smart Notes
+          </h2>
+          <p className="text-xs text-slate-400 truncate">
+            Source: <span className="text-slate-200">{activeDoc.name}</span>
+          </p>
+        </div>
+
+        <div className="p-5 space-y-6">
+          {/* Style Selector */}
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-violet-400" />
-              Generate Smart Notes
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Source: <span className="text-slate-200 font-medium">{activeDoc.name}</span>
-            </p>
+            <label className="text-xs font-medium text-slate-400 block mb-3 uppercase tracking-wider flex items-center gap-2">
+              <LayoutTemplate className="w-3.5 h-3.5" /> Select Format
+            </label>
+            <div className="grid grid-cols-1 gap-2">
+              {STYLES.map((style) => {
+                const isSelected = selectedStyle === style.key;
+                return (
+                  <div
+                    key={style.key}
+                    onClick={() => !isGenerating && setSelectedStyle(style.key)}
+                    className={`p-3 rounded-xl border transition-all ${
+                      isGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    } ${
+                      isSelected
+                        ? 'bg-[#2a2a35] border-purple-500/50 text-white shadow-sm'
+                        : 'bg-transparent border-slate-800/50 hover:bg-[#1a1a24] text-slate-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium flex justify-between items-center">
+                      <span>{style.title}</span>
+                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">{style.desc}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Custom Instructions */}
+          <div>
+             <label className="text-xs font-medium text-slate-400 block mb-2 uppercase tracking-wider">
+               Custom Instructions (Optional)
+             </label>
+             <textarea
+               disabled={isGenerating}
+               value={customInstructions}
+               onChange={(e) => setCustomInstructions(e.target.value)}
+               placeholder="e.g. Focus on definitions..."
+               rows={2}
+               className="w-full bg-[#0a0a0f] text-sm text-slate-200 border border-slate-800/50 rounded-xl px-3 py-2.5 outline-none focus:border-slate-600 focus:ring-1 focus:ring-slate-600 disabled:opacity-50 resize-none shadow-inner"
+             />
           </div>
 
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="btn btn-primary text-xs py-2.5 px-5 flex items-center gap-2 shadow-lg shadow-violet-600/30"
+            className="w-full bg-white text-black font-medium py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             {isGenerating ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Generating with Gemini...</span>
+                <span>Generating...</span>
               </>
             ) : (
               <>
@@ -218,290 +241,152 @@ export default function SmartNotesView({
               </>
             )}
           </button>
+          
+          {errorMsg && (
+            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs leading-relaxed flex flex-col gap-2">
+              <div className="flex items-center justify-between font-medium text-red-300">
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Error
+                </div>
+              </div>
+              <p>{errorMsg}</p>
+            </div>
+          )}
         </div>
-
-        {/* 11 Style Selector Grid */}
-        <div>
-          <label className="text-xs font-semibold text-slate-300 block mb-2">
-            Select Study Format (11 Formats):
-          </label>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-            {STYLES.map((style) => {
-              const isSelected = selectedStyle === style.key;
-              return (
-                <div
-                  key={style.key}
-                  onClick={() => !isGenerating && setSelectedStyle(style.key)}
-                  className={`p-3 rounded-xl border transition-all ${
-                    isGenerating ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                  } ${
-                    isSelected
-                      ? 'bg-violet-950/40 border-violet-500 shadow-sm shadow-violet-500/20'
-                      : 'bg-slate-900/60 border-slate-800/90 hover:border-slate-700 hover:bg-slate-900'
-                  }`}
-                >
-                  <div className="text-xs font-bold text-white flex items-center justify-between">
-                    <span>{style.title}</span>
-                    {isSelected && <span className="w-2 h-2 rounded-full bg-violet-400" />}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-1 line-clamp-1">
-                    {style.desc}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Custom Instructions (Optional) */}
-        <div>
-          <label className="text-xs font-semibold text-slate-300 block mb-1">
-            Custom Instructions (Optional):
-          </label>
-          <input
-            type="text"
-            disabled={isGenerating}
-            value={customInstructions}
-            onChange={(e) => setCustomInstructions(e.target.value)}
-            placeholder="e.g. Focus on definitions, simplify for midterms, or highlight real-world applications"
-            className="w-full bg-slate-950 text-xs text-slate-200 border border-slate-800 rounded-xl px-3 py-2 outline-none focus:border-violet-500 disabled:opacity-60"
-          />
-        </div>
-
-        {/* User-Friendly Differentiated Error & Rate Limit Banners */}
-        {errorMsg && (
-          <div>
-            {errorType === 'rate_limit' && (
-              <div className="bg-amber-950/40 border border-amber-700/60 p-4 rounded-xl space-y-2.5 text-xs text-amber-200 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-bold text-amber-300">
-                    <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Gemini API Temporary Rate Limit Reached</span>
-                  </div>
-                  <span className="badge badge-amber text-[9px]">Rate Limit (HTTP 429)</span>
-                </div>
-                <p className="text-slate-300 leading-relaxed text-[11px]">
-                  {errorMsg}
-                </p>
-                <div className="flex items-center justify-between pt-1 border-t border-amber-800/40 text-[11px]">
-                  <span className="text-slate-400">
-                    Active selection preserved: <strong className="text-slate-200">{STYLES.find(s => s.key === selectedStyle)?.title || selectedStyle}</strong>
-                  </span>
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isGenerating}
-                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5 text-amber-300 border-amber-700 hover:bg-amber-900/40"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Retry Generate Notes</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {errorType === 'quota_exhausted' && (
-              <div className="bg-rose-950/50 border border-rose-800/80 p-4 rounded-xl space-y-2 text-xs text-rose-200 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-bold text-rose-300">
-                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                    <span>Daily Quota Exhausted</span>
-                  </div>
-                  <span className="badge badge-rose text-[9px]">Quota Limit (HTTP 429)</span>
-                </div>
-                <p className="text-slate-300 leading-relaxed text-[11px]">
-                  {errorMsg}
-                </p>
-                <div className="text-[10px] text-slate-500 pt-1 border-t border-rose-900/40">
-                  Tip: Google AI Studio free tier limits reset every 24 hours. Your material and selection remain saved in StudyVerse.
-                </div>
-              </div>
-            )}
-
-            {errorType === 'high_demand' && (
-              <div className="bg-violet-950/40 border border-violet-700/60 p-4 rounded-xl space-y-2 text-xs text-violet-200 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-bold text-violet-300">
-                    <AlertTriangle className="w-4 h-4 text-violet-400 shrink-0" />
-                    <span>Gemini Peak Demand (HTTP 503)</span>
-                  </div>
-                  <button
-                    onClick={handleGenerate}
-                    disabled={isGenerating}
-                    className="btn btn-primary text-xs py-1 px-3 flex items-center gap-1"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Retry</span>
-                  </button>
-                </div>
-                <p className="text-slate-300 leading-relaxed text-[11px]">
-                  {errorMsg}
-                </p>
-              </div>
-            )}
-
-            {errorType === 'in_progress' && (
-              <div className="bg-cyan-950/40 border border-cyan-700/60 p-3 rounded-xl text-xs text-cyan-200 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-cyan-400 shrink-0" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
-
-            {(!errorType || errorType === 'generic') && (
-              <div className="bg-rose-950/80 border border-rose-800 text-rose-200 p-3 rounded-xl text-xs flex items-center justify-between">
-                <span>{errorMsg}</span>
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                  className="btn btn-secondary text-xs py-1 px-2.5 ml-3 shrink-0"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Notes Display Area */}
-      <div className="space-y-4">
-        {/* Saved Notes Tabs */}
-        {notes.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800">
-            <span className="text-xs font-semibold text-slate-400 shrink-0 mr-2">
-              Saved Notes ({notes.length}):
-            </span>
-            {notes.map((n) => {
-              const isActive = n.id === activeNoteId;
-              return (
-                <button
-                  key={n.id}
-                  onClick={() => {
-                    setActiveNoteId(n.id);
-                    setIsEditing(false);
-                  }}
-                  className={`text-xs px-3 py-1.5 rounded-lg font-medium shrink-0 transition flex items-center gap-1.5 ${
-                    isActive
-                      ? 'bg-violet-600 text-white shadow-sm'
-                      : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>{n.style_title || n.style_key}</span>
-                  <span className="text-[10px] opacity-70">({n.created_at})</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Note Content Viewer */}
-        {currentNote ? (
-          <div className="glass-card p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <span>{currentNote.style_title}</span>
-                  <span className="badge badge-purple text-[10px]">Saved in SQLite</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Generated {currentNote.created_at} for {currentNote.doc_name}
-                </p>
-              </div>
-
-              {/* Action Toolbar */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleCopy(currentNote.content)}
-                  className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
-                  title="Copy formatted markdown to clipboard"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'Copied!' : 'Copy'}</span>
-                </button>
-
-                <button
-                  onClick={() => handleDownload(currentNote)}
-                  className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
-                  title="Download as .md file"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download .md</span>
-                </button>
-
-                {isEditing ? (
-                  <button
-                    onClick={() => handleSaveEdit(currentNote.id)}
-                    className="btn btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Save Edits</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setEditContent(currentNote.content);
-                      setIsEditing(true);
-                    }}
-                    className="btn btn-secondary text-xs py-1.5 px-3 flex items-center gap-1.5"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => handleDeleteNote(currentNote.id)}
-                  className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800"
-                  title="Delete note"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Note Body */}
-            {isEditing ? (
-              <div className="space-y-2">
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  rows={18}
-                  className="w-full bg-slate-950 font-mono text-xs text-slate-200 border border-violet-500/60 rounded-xl p-4 outline-none leading-relaxed"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setIsEditing(false)}
-                    className="btn btn-secondary text-xs"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleSaveEdit(currentNote.id)}
-                    className="btn btn-primary text-xs"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-800/80">
-                <MarkdownView content={currentNote.content} />
-              </div>
-            )}
+      {/* Main Content Area: Reader & Tabs */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0a0a0f]">
+        
+        {/* Note Tabs */}
+        {notes.length > 0 ? (
+          <div className="flex-none p-4 border-b border-slate-800/50 bg-[#141419]/50 overflow-x-auto flex items-center gap-2 scrollbar-hide">
+             {notes.map((n) => {
+               const isActive = n.id === activeNoteId;
+               return (
+                 <button
+                   key={n.id}
+                   onClick={() => {
+                     setActiveNoteId(n.id);
+                     setIsEditing(false);
+                   }}
+                   className={`
+                     px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-2 border
+                     ${isActive 
+                       ? 'bg-[#2a2a35] text-white border-slate-700 shadow-sm' 
+                       : 'bg-transparent text-slate-400 border-transparent hover:text-slate-200 hover:bg-[#1a1a24] hover:border-slate-800/50'
+                     }
+                   `}
+                 >
+                   <FileText className="w-4 h-4" />
+                   {n.style_title || n.style_key}
+                 </button>
+               );
+             })}
           </div>
         ) : (
-          !isGenerating && (
-            <div className="glass-card p-12 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
-                <FileText className="w-6 h-6" />
-              </div>
-              <h4 className="text-sm font-semibold text-slate-300">No Notes Generated Yet</h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Choose one of the 11 study formats above and click "Generate Notes" to produce AI-synthesized notes with Gemini.
-              </p>
-            </div>
-          )
+           <div className="flex-none p-4 border-b border-slate-800/50 bg-[#141419]/50 flex items-center h-[65px]">
+             <span className="text-sm text-slate-500 italic">No notes generated yet</span>
+           </div>
         )}
+
+        {/* Note Viewer */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 flex justify-center">
+          {currentNote ? (
+            <div className="w-full max-w-4xl flex flex-col">
+               {/* Note Header */}
+               <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+                 <div>
+                   <h1 className="text-2xl font-semibold text-white mb-1">{currentNote.style_title}</h1>
+                   <div className="text-sm text-slate-400 flex items-center gap-2">
+                     <Clock className="w-3.5 h-3.5" />
+                     Generated {currentNote.created_at}
+                   </div>
+                 </div>
+                 
+                 <div className="flex items-center gap-2">
+                   {isEditing ? (
+                     <button
+                       onClick={() => handleSaveEdit(currentNote.id)}
+                       className="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-lg text-sm flex items-center gap-1.5 transition-colors"
+                     >
+                       <Check className="w-4 h-4" /> Save
+                     </button>
+                   ) : (
+                     <button
+                       onClick={() => {
+                         setEditContent(currentNote.content);
+                         setIsEditing(true);
+                       }}
+                       className="px-3 py-1.5 bg-[#141419] hover:bg-[#2a2a35] text-slate-300 rounded-lg text-sm flex items-center gap-1.5 transition-colors border border-slate-800/50 shadow-sm"
+                     >
+                       <Edit3 className="w-4 h-4" /> Edit
+                     </button>
+                   )}
+                   <button
+                     onClick={() => handleCopy(currentNote.content)}
+                     className="px-3 py-1.5 bg-[#141419] hover:bg-[#2a2a35] text-slate-300 rounded-lg text-sm flex items-center gap-1.5 transition-colors border border-slate-800/50 shadow-sm"
+                   >
+                     {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                     {copied ? 'Copied' : 'Copy'}
+                   </button>
+                   <button
+                     onClick={() => handleDownload(currentNote)}
+                     className="px-3 py-1.5 bg-[#141419] hover:bg-[#2a2a35] text-slate-300 rounded-lg text-sm flex items-center gap-1.5 transition-colors border border-slate-800/50 shadow-sm"
+                   >
+                     <Download className="w-4 h-4" /> Export
+                   </button>
+                   <button
+                     onClick={() => handleDeleteNote(currentNote.id)}
+                     className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                   >
+                     <Trash2 className="w-4 h-4" />
+                   </button>
+                 </div>
+               </div>
+
+               {/* Note Content */}
+               <div className="bg-[#141419]/30 rounded-2xl p-6 md:p-8 border border-slate-800/50 shadow-sm">
+                 {isEditing ? (
+                   <div className="flex flex-col gap-4">
+                     <textarea
+                       value={editContent}
+                       onChange={(e) => setEditContent(e.target.value)}
+                       className="w-full h-[500px] bg-[#0a0a0f] text-slate-300 font-mono text-sm p-4 rounded-xl outline-none border border-slate-800/50 focus:border-slate-600 resize-none leading-relaxed shadow-inner"
+                     />
+                     <div className="flex justify-end gap-3">
+                       <button
+                         onClick={() => setIsEditing(false)}
+                         className="px-4 py-2 bg-[#141419] text-slate-300 hover:bg-[#2a2a35] rounded-lg text-sm transition-colors border border-slate-800/50"
+                       >
+                         Cancel
+                       </button>
+                       <button
+                         onClick={() => handleSaveEdit(currentNote.id)}
+                         className="px-4 py-2 bg-white text-black hover:bg-slate-200 font-medium rounded-lg text-sm transition-colors shadow-sm"
+                       >
+                         Save Changes
+                       </button>
+                     </div>
+                   </div>
+                 ) : (
+                   <div className="prose prose-invert max-w-none prose-p:leading-relaxed prose-headings:text-white prose-a:text-purple-400 prose-pre:bg-[#0a0a0f] prose-pre:border prose-pre:border-slate-800/50 text-slate-200">
+                     <MarkdownView content={currentNote.content} />
+                   </div>
+                 )}
+               </div>
+               <div className="h-12" />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full max-w-md text-center text-slate-400">
+               <FileText className="w-12 h-12 text-slate-600 mb-4" />
+               <h3 className="text-lg font-medium text-white mb-2">Ready to take notes</h3>
+               <p className="text-sm leading-relaxed">
+                 Select a format from the sidebar and click Generate to create AI-powered smart notes from your document.
+               </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
