@@ -1,4 +1,9 @@
 import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 /**
  * Lightweight, robust Markdown and Citation renderer for StudyVerse
@@ -7,153 +12,138 @@ import React from 'react';
 export default function MarkdownView({ content, onCitationClick }) {
   if (!content) return null;
 
-  // Render citation badges [Page X] or [Slide Y]
-  const renderFormattedText = (text) => {
-    // Split by citation patterns: [Page \d+] or [Slide \d+]
+  const processText = (text) => {
+    if (typeof text !== 'string') return text;
     const parts = text.split(/(\[(?:Page|Slide)\s+\d+\])/gi);
+    if (parts.length === 1) return text;
 
     return parts.map((part, idx) => {
-      const citationMatch = part.match(/^\[(Page|Slide)\s+(\d+)\]$/i);
-      if (citationMatch) {
-        const type = citationMatch[1];
-        const num = citationMatch[2];
+      const match = part.match(/^\[(Page|Slide)\s+(\d+)\]$/i);
+      if (match) {
         return (
           <span
             key={idx}
-            className="citation-pill hover:border-cyan-400 hover:text-cyan-200 transition-colors"
-            title={`Referenced from ${type} ${num}`}
-            onClick={() => onCitationClick && onCitationClick({ type, num })}
+            className="citation-pill hover:border-cyan-400 hover:text-cyan-200 transition-colors cursor-pointer inline-block"
+            title={`Referenced from ${match[1]} ${match[2]}`}
+            onClick={() => onCitationClick && onCitationClick({ type: match[1], num: match[2] })}
           >
-            📍 {type} {num}
+            📍 {match[1]} {match[2]}
           </span>
         );
       }
-
-      // Format bold, italic, and inline code
-      // Process bold **text**
-      const boldParts = part.split(/(\*\*.*?\*\*)/g);
-      return boldParts.map((bPart, bIdx) => {
-        if (bPart.startsWith('**') && bPart.endsWith('**')) {
-          return <strong key={`${idx}-${bIdx}`}>{bPart.slice(2, -2)}</strong>;
-        }
-        // Process inline code `code`
-        const codeParts = bPart.split(/(`.*?`)/g);
-        return codeParts.map((cPart, cIdx) => {
-          if (cPart.startsWith('`') && cPart.endsWith('`')) {
-            return <code key={`${idx}-${bIdx}-${cIdx}`}>{cPart.slice(1, -1)}</code>;
-          }
-          return cPart;
-        });
-      });
+      return part;
     });
   };
 
-  const lines = content.split('\n');
-  const elements = [];
-  let inCodeBlock = false;
-  let codeBuffer = [];
-  let listBuffer = [];
-  let inOrderedList = false;
+  const processChildren = (children) => {
+    return React.Children.map(children, (child) => {
+      if (typeof child === 'string') {
+        return processText(child);
+      }
+      if (React.isValidElement(child) && child.props && child.props.children) {
+        return React.cloneElement(child, {
+          children: processChildren(child.props.children)
+        });
+      }
+      return child;
+    });
+  };
 
-  const flushList = () => {
-    if (listBuffer.length > 0) {
-      if (inOrderedList) {
-        elements.push(
-          <ol key={`ol-${elements.length}`} className="list-decimal pl-6 space-y-1 mb-3 text-slate-300">
-            {listBuffer.map((item, i) => (
-              <li key={i}>{renderFormattedText(item)}</li>
-            ))}
-          </ol>
-        );
-      } else {
-        elements.push(
-          <ul key={`ul-${elements.length}`} className="list-disc pl-6 space-y-1 mb-3 text-slate-300">
-            {listBuffer.map((item, i) => (
-              <li key={i}>{renderFormattedText(item)}</li>
-            ))}
-          </ul>
+  const components = {
+    code({ node, className, children, ...props }) {
+      const isBlock = /language-/.test(className || '') || 
+        (node?.position?.start?.line !== node?.position?.end?.line);
+      if (isBlock) {
+        const lang = (className || '').replace('language-', '');
+        return (
+          <div className="relative group my-4">
+            {lang && (
+              <span className="absolute top-2 right-3 text-[10px] text-slate-500 font-mono uppercase">{lang}</span>
+            )}
+            <pre className="bg-slate-950 p-4 rounded-xl border border-slate-800 overflow-x-auto text-sm text-cyan-300 font-mono">
+              <code className={className} {...props}>
+                {children}
+              </code>
+            </pre>
+          </div>
         );
       }
-      listBuffer = [];
+      return (
+        <code className="bg-slate-800 text-cyan-300 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+          {children}
+        </code>
+      );
+    },
+    table({ children, ...props }) {
+      return (
+        <div className="overflow-x-auto my-4">
+          <table className="min-w-full divide-y divide-slate-800 border border-slate-800 rounded-lg" {...props}>
+            {processChildren(children)}
+          </table>
+        </div>
+      );
+    },
+    thead({ children, ...props }) {
+      return <thead className="bg-slate-900/50" {...props}>{processChildren(children)}</thead>;
+    },
+    tbody({ children, ...props }) {
+      return <tbody className="divide-y divide-slate-800 bg-transparent" {...props}>{processChildren(children)}</tbody>;
+    },
+    tr({ children, ...props }) {
+      return <tr className="hover:bg-slate-800/30 transition-colors" {...props}>{processChildren(children)}</tr>;
+    },
+    th({ children, ...props }) {
+      return <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider" {...props}>{processChildren(children)}</th>;
+    },
+    td({ children, ...props }) {
+      return <td className="px-4 py-3 text-sm text-slate-300" {...props}>{processChildren(children)}</td>;
+    },
+    blockquote({ children, ...props }) {
+      return (
+        <blockquote className="border-l-4 border-purple-500 bg-purple-950/20 pl-4 py-2 my-2 rounded-r-lg text-slate-300 italic text-sm" {...props}>
+          {processChildren(children)}
+        </blockquote>
+      );
+    },
+    a({ children, ...props }) {
+      return <a className="text-cyan-400 hover:text-cyan-300 underline" {...props}>{processChildren(children)}</a>;
+    },
+    h1({ children, ...props }) {
+      return <h1 className="text-2xl font-bold text-white mt-5 mb-2 pb-1 border-b border-slate-800" {...props}>{processChildren(children)}</h1>;
+    },
+    h2({ children, ...props }) {
+      return <h2 className="text-xl font-bold text-purple-300 mt-4 mb-2" {...props}>{processChildren(children)}</h2>;
+    },
+    h3({ children, ...props }) {
+      return <h3 className="text-lg font-semibold text-slate-200 mt-3 mb-1" {...props}>{processChildren(children)}</h3>;
+    },
+    p({ children, ...props }) {
+      return <p className="mb-2 text-slate-300 leading-relaxed text-sm" {...props}>{processChildren(children)}</p>;
+    },
+    li({ children, ...props }) {
+      return <li className="text-slate-300 text-sm" {...props}>{processChildren(children)}</li>;
+    },
+    ul({ children, ...props }) {
+      return <ul className="list-disc pl-6 space-y-1 mb-3 text-slate-300" {...props}>{processChildren(children)}</ul>;
+    },
+    ol({ children, ...props }) {
+      return <ol className="list-decimal pl-6 space-y-1 mb-3 text-slate-300" {...props}>{processChildren(children)}</ol>;
     }
   };
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  let processedContent = content
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$')
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
 
-    // Code blocks ```
-    if (line.trim().startsWith('```')) {
-      if (inCodeBlock) {
-        flushList();
-        elements.push(
-          <pre key={`code-${elements.length}`} className="bg-slate-950 p-4 rounded-xl border border-slate-800 my-3 overflow-x-auto text-sm text-cyan-300 font-mono">
-            <code>{codeBuffer.join('\n')}</code>
-          </pre>
-        );
-        codeBuffer = [];
-        inCodeBlock = false;
-      } else {
-        flushList();
-        inCodeBlock = true;
-      }
-      continue;
-    }
-
-    if (inCodeBlock) {
-      codeBuffer.push(line);
-      continue;
-    }
-
-    // Headers
-    if (line.startsWith('# ')) {
-      flushList();
-      elements.push(
-        <h1 key={`h1-${elements.length}`} className="text-2xl font-bold text-white mt-5 mb-2 pb-1 border-b border-slate-800">
-          {renderFormattedText(line.slice(2))}
-        </h1>
-      );
-    } else if (line.startsWith('## ')) {
-      flushList();
-      elements.push(
-        <h2 key={`h2-${elements.length}`} className="text-xl font-bold text-purple-300 mt-4 mb-2">
-          {renderFormattedText(line.slice(3))}
-        </h2>
-      );
-    } else if (line.startsWith('### ')) {
-      flushList();
-      elements.push(
-        <h3 key={`h3-${elements.length}`} className="text-lg font-semibold text-slate-200 mt-3 mb-1">
-          {renderFormattedText(line.slice(4))}
-        </h3>
-      );
-    } else if (line.startsWith('> ')) {
-      flushList();
-      elements.push(
-        <blockquote key={`quote-${elements.length}`} className="border-l-4 border-purple-500 bg-purple-950/20 pl-4 py-2 my-2 rounded-r-lg text-slate-300 italic text-sm">
-          {renderFormattedText(line.slice(2))}
-        </blockquote>
-      );
-    } else if (/^[-*+]\s+/.test(line)) {
-      if (inOrderedList) flushList();
-      inOrderedList = false;
-      listBuffer.push(line.replace(/^[-*+]\s+/, ''));
-    } else if (/^\d+\.\s+/.test(line)) {
-      if (!inOrderedList) flushList();
-      inOrderedList = true;
-      listBuffer.push(line.replace(/^\d+\.\s+/, ''));
-    } else if (line.trim() === '') {
-      flushList();
-    } else {
-      flushList();
-      elements.push(
-        <p key={`p-${elements.length}`} className="mb-2 text-slate-300 leading-relaxed text-sm">
-          {renderFormattedText(line)}
-        </p>
-      );
-    }
-  }
-
-  flushList();
-
-  return <div className="markdown-body select-text">{elements}</div>;
+  return (
+    <div className="markdown-body select-text">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        components={components}
+      >
+        {processedContent}
+      </ReactMarkdown>
+    </div>
+  );
 }

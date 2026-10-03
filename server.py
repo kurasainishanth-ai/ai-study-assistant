@@ -22,6 +22,13 @@ from summarizer import (
 import db
 from services.ai_tutor import ask_ai_tutor
 from agent.orchestrator import generate_dynamic_response
+from services.gemini_caller import (
+    GeminiServiceAuthError,
+    GeminiServiceQuotaExhaustedError,
+    GeminiServiceRateLimitError,
+    GeminiServiceTemporaryError,
+    GeminiServiceError
+)
 
 from services.flashcard_service import generate_flashcards
 from services.quiz_service import generate_quiz, evaluate_quiz
@@ -173,7 +180,16 @@ async def upload_material(file: UploadFile = File(...)):
             "error": None
         }
         db.save_material(item)
-        return {"success": True, "material": item}
+        
+        response_material = {
+            "id": item["id"],
+            "name": item["name"],
+            "type": item["type"],
+            "size_kb": item["size_kb"],
+            "upload_time": item["upload_time"],
+            "status": item["status"]
+        }
+        return {"success": True, "material": response_material}
     except Exception as e:
         err_item = {
             "id": doc_id,
@@ -367,11 +383,9 @@ def delete_flashcard_endpoint(card_id: int):
 
 @app.post("/api/tutor/chat")
 def tutor_chat_endpoint(req: TutorChatRequest):
-    """Conversational tutor grounded in document content with citations."""
+    """Conversational AI study agent with dynamic response formats."""
     try:
-        # Use our integrated dynamic agent instead of the legacy text-only tutor
         result = generate_dynamic_response(req.doc_id, req.message)
-        # Adapt agent output format to frontend expectations
         return {
             'content': result.get('summary', ''),
             'response': result.get('summary', ''),
@@ -381,10 +395,16 @@ def tutor_chat_endpoint(req: TutorChatRequest):
         }
     except GeminiClientAuthError as e:
         raise HTTPException(status_code=401, detail=str(e))
-    except GeminiTemporaryUnavailableError as e:
+    except GeminiServiceAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except (GeminiQuotaExhaustedError, GeminiServiceQuotaExhaustedError) as e:
+        raise HTTPException(status_code=429, detail=f"API quota exhausted: {str(e)}")
+    except (GeminiRateLimitError, GeminiServiceRateLimitError) as e:
+        raise HTTPException(status_code=429, detail=f"Rate limit reached, please try again shortly: {str(e)}")
+    except (GeminiTemporaryUnavailableError, GeminiServiceTemporaryError) as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
 @app.get("/api/tutor/history/{doc_id}")
 def get_tutor_history_endpoint(doc_id: str):

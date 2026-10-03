@@ -186,3 +186,50 @@ def call_gemini_with_retry(
                     raise GeminiServiceTemporaryError(
                         f"Gemini API temporary error: {last_reason}. Retries exhausted."
                     ) from e
+
+def call_gemini_with_retry_full(contents, system_instruction=None, temperature=0.3, model=DEFAULT_MODEL):
+    """Like call_gemini_with_retry but returns the full response object."""
+    client = get_gemini_client()
+    config = types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        temperature=temperature,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+    )
+    last_category = ""
+    last_reason = ""
+    last_retry_after = None
+    
+    for attempt in range(1, MAX_RETRIES + 2):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config
+            )
+            return response
+        except Exception as e:
+            is_retryable, category, reason, retry_after = classify_gemini_error(e)
+            last_category = category
+            last_reason = reason
+            last_retry_after = retry_after
+            logger.warning(f"[Gemini Caller] Attempt {attempt}/{MAX_RETRIES + 1} failed | {category}: {reason}")
+            if not is_retryable:
+                if category == "quota_exhausted":
+                    raise GeminiServiceQuotaExhaustedError(reason) from e
+                elif category == "auth_error":
+                    raise GeminiServiceAuthError(reason) from e
+                raise GeminiServiceError(reason) from e
+            if attempt <= MAX_RETRIES:
+                if retry_after and retry_after > 0:
+                    delay = min(max(retry_after + 1.0, 3.0), MAX_DELAY_SECONDS)
+                elif category == "rate_limit":
+                    delay = min(INITIAL_RATE_LIMIT_DELAY * (2.0 ** (attempt - 1)) + random.uniform(0.2, 0.8), MAX_DELAY_SECONDS)
+                else:
+                    delay = min(INITIAL_SERVER_ERROR_DELAY * (2.0 ** (attempt - 1)) + random.uniform(0.1, 0.4), MAX_DELAY_SECONDS)
+                logger.info(f"[Gemini Caller] Waiting {delay:.1f}s before retry {attempt + 1}...")
+                time.sleep(delay)
+            else:
+                if last_category == "rate_limit":
+                    raise GeminiServiceRateLimitError(f"Rate limit retries exhausted.", retry_after=last_retry_after) from e
+                else:
+                    raise GeminiServiceTemporaryError(f"Temporary error: {last_reason}. Retries exhausted.") from e

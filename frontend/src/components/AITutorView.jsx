@@ -15,10 +15,10 @@ import { api } from '../services/api';
 import MarkdownView from './MarkdownView';
 
 const SUGGESTED_PROMPTS = [
-  'What is the core thesis or main topic?',
+  'Summarize the key concepts from this document',
   'Explain the most challenging concept with an analogy',
-  'What are common misconceptions or traps students make?',
-  'Can you give me 3 practice application scenarios?',
+  'Quiz me on this material',
+  'What are the practical applications of these concepts?',
 ];
 
 export default function AITutorView({
@@ -73,8 +73,9 @@ export default function AITutorView({
       const response = await api.askTutor(activeDoc.id, text, level);
       const assistantMsg = {
         role: 'assistant',
-        content: response.content || response.response,
+        content: response.content || response.response || '',
         citations: response.citations || [],
+        raw: response.raw_agent_response || null,
         created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, assistantMsg]);
@@ -122,11 +123,10 @@ export default function AITutorView({
           </div>
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <span>Document-Grounded Tutor</span>
-              <span className="badge badge-cyan text-[10px]">Citations Enabled</span>
+              <span>AI Study Agent</span>
             </h2>
             <p className="text-xs text-slate-400">
-              Grounded exclusively in: <span className="text-slate-200">{activeDoc.name}</span>
+              Active document: <span className="text-slate-200">{activeDoc.name}</span>
             </p>
           </div>
         </div>
@@ -172,7 +172,7 @@ export default function AITutorView({
             <div>
               <h3 className="text-sm font-bold text-white">Ask your AI Study Agent</h3>
               <p className="text-xs text-slate-400 max-w-md mt-1">
-                Ask specific questions about formulas, concepts, or page sections. All responses cite exact source locations when available.
+                Ask questions about your study materials, get explanations, generate quizzes, or explore academic topics.
               </p>
             </div>
 
@@ -258,7 +258,7 @@ export default function AITutorView({
             </div>
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl rounded-bl-xs text-xs text-slate-400 flex items-center gap-2">
               <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
-              <span>Analyzing document and formulating citation-grounded response...</span>
+              <span>Thinking...</span>
             </div>
           </div>
         )}
@@ -278,7 +278,7 @@ export default function AITutorView({
               handleSendMessage();
             }
           }}
-          placeholder={`Ask anything about "${activeDoc.name}"...`}
+          placeholder={`Ask me anything...`}
           className="flex-1 bg-transparent text-xs text-white placeholder-slate-500 px-3 py-2 outline-none"
         />
         <button
@@ -286,7 +286,7 @@ export default function AITutorView({
           disabled={!inputText.trim() || isLoading}
           className="btn btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
         >
-          <span>Ask Tutor</span>
+          <span>Send</span>
           <Send className="w-3.5 h-3.5" />
         </button>
       </div>
