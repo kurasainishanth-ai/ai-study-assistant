@@ -113,14 +113,23 @@ function QuizRenderer({ data, runSubmit, submitting }) {
       {qs.map((q, i) => (
         <div key={i} className="quiz-q">
           <b>{i + 1}. {q.question}</b>
-          <div className="quiz-options">
-            {q.options?.map((opt, j) => (
-              <label key={j} className={`quiz-option${answers[q.id || i] === opt ? " chosen" : ""}`}>
-                <input type="radio" name={`q_${i}`} checked={answers[q.id || i] === opt} onChange={() => setAnswers({ ...answers, [q.id || i]: opt })} />
-                <span>{opt}</span>
-              </label>
-            ))}
-          </div>
+          {q.options && q.options.length > 0 ? (
+            <div className="quiz-options">
+              {q.options.map((opt, j) => (
+                <label key={j} className={`quiz-option${answers[q.id || i] === opt ? " chosen" : ""}`}>
+                  <input type="radio" name={`q_${i}`} checked={answers[q.id || i] === opt} onChange={() => setAnswers({ ...answers, [q.id || i]: opt })} />
+                  <span>{opt}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <textarea 
+              className="quiz-textarea" 
+              placeholder="Type your answer here..."
+              value={answers[q.id || i] || ""}
+              onChange={(e) => setAnswers({ ...answers, [q.id || i]: e.target.value })}
+            />
+          )}
         </div>
       ))}
       <button className="btn-primary" disabled={submitting} onClick={() => runSubmit(qs, answers)}>

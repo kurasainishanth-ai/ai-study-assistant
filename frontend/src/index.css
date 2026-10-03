@@ -983,3 +983,20 @@ header h1 {
   .flip-card { height: 220px; }
   .flip-front, .flip-back { padding: 20px; font-size: 15px; }
 }
+.msg.you .md-body { color: #fff; }
+.msg.you .md-body code { background: rgba(255,255,255,0.15); color: #fff; }
+.quiz-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s;
+}
+.quiz-textarea:focus { border-color: var(--green); }
