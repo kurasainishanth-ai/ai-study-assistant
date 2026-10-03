@@ -8,7 +8,9 @@ import {
   ArrowRight,
   Award,
   Bot,
-  FileBox
+  FileBox,
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -26,118 +28,138 @@ export default function DashboardView({
   }, [materials]);
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-8 md:p-12 max-w-7xl mx-auto space-y-10">
 
-      {/* Welcome — compact */}
-      <div className="rounded-2xl bg-gradient-to-r from-violet-900/40 to-slate-900/80 p-6 border border-violet-500/20">
-        <h2 className="text-xl font-bold text-white mb-1">
-          Welcome to <span className="text-violet-400">StudyVerse</span>
-        </h2>
-        <p className="text-sm text-slate-400 mb-4 max-w-lg">
-          Upload study materials and let AI transform them into notes, flashcards, and quizzes.
-        </p>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onUploadClick}
-            className="btn btn-primary text-xs py-2 px-4 flex items-center gap-2"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            Upload Material
-          </button>
-          {materials.length > 0 && (
+      {/* Hero Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-6">
+        <div className="space-y-4 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-xs font-semibold text-violet-300">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI-Powered Study Environment</span>
+          </div>
+          <h2 className="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
+            Elevate Your <br className="hidden md:block"/>
+            <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">Learning Journey</span>
+          </h2>
+          <p className="text-base text-slate-400 leading-relaxed max-w-xl">
+            Upload your course materials and let StudyVerse automatically generate smart notes, spaced-repetition flashcards, and diagnostic quizzes tailored to your syllabus.
+          </p>
+          <div className="pt-4 flex items-center gap-4">
             <button
-              onClick={() => onNavigateTab('library')}
-              className="btn btn-secondary text-xs py-2 px-4 flex items-center gap-1.5"
+              onClick={onUploadClick}
+              className="btn btn-primary text-sm py-3 px-6 shadow-lg shadow-violet-500/25"
             >
-              <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
-              Library ({materials.length})
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Material
             </button>
-          )}
+            {materials.length > 0 && (
+              <button
+                onClick={() => onNavigateTab('library')}
+                className="btn btn-secondary text-sm py-3 px-6"
+              >
+                <BookOpen className="w-4 h-4 text-cyan-400 mr-2" />
+                View Library
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Quick actions — 4 cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Feature Cards Grid (Bento style) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { id: 'notes', icon: FileText, label: 'Smart Notes', desc: 'Generate study notes', color: 'violet' },
-          { id: 'flashcards', icon: Layers, label: 'Flashcards', desc: 'Spaced repetition cards', color: 'indigo' },
-          { id: 'quiz', icon: BrainCircuit, label: 'Quiz Arena', desc: 'Test your knowledge', color: 'emerald' },
-          { id: 'tutor', icon: Bot, label: 'AI Tutor', desc: 'Ask anything', color: 'cyan' },
+          { id: 'notes', icon: FileText, label: 'Smart Notes', desc: 'Synthesize materials into cheat sheets and outlines.', color: 'violet' },
+          { id: 'flashcards', icon: Layers, label: 'Flashcards', desc: 'Active recall training with spaced repetition.', color: 'indigo' },
+          { id: 'quiz', icon: BrainCircuit, label: 'Quiz Arena', desc: 'Targeted tests to isolate learning blind spots.', color: 'emerald' },
+          { id: 'tutor', icon: Bot, label: 'AI Tutor', desc: 'Get explanations grounded in your documents.', color: 'cyan' },
         ].map(({ id, icon: Icon, label, desc, color }) => (
-          <button
+          <div
             key={id}
             onClick={() => onNavigateTab(id)}
-            className="glass-card p-4 text-left cursor-pointer hover:border-violet-500/40 transition group"
+            className="glass-card p-6 md:p-8 cursor-pointer group flex flex-col items-start"
           >
-            <div className={`w-9 h-9 rounded-lg bg-${color}-600/20 text-${color}-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition`}>
-              <Icon className="w-4.5 h-4.5" />
+            <div className={`w-12 h-12 rounded-2xl bg-${color}-500/10 border border-${color}-500/20 text-${color}-400 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-${color}-500/20 transition-all duration-300`}>
+              <Icon className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-semibold text-white mb-0.5">{label}</h3>
-            <p className="text-xs text-slate-500">{desc}</p>
-          </button>
+            <h3 className="text-lg font-bold text-white mb-2">{label}</h3>
+            <p className="text-sm text-slate-400 leading-relaxed mb-6 flex-grow">{desc}</p>
+            <div className={`mt-auto flex items-center text-xs font-semibold text-${color}-400 group-hover:translate-x-1 transition-transform`}>
+              Explore <ArrowRight className="w-4 h-4 ml-1.5" />
+            </div>
+          </div>
         ))}
       </div>
 
-      {/* Materials + Snapshot */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Two Column Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        {/* Recent materials */}
-        <div className="lg:col-span-2 glass-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-violet-400" />
+        {/* Recent Materials (Wider Column) */}
+        <div className="lg:col-span-2 glass-card p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2.5">
+              <BookOpen className="w-5 h-5 text-violet-400" />
               Recent Materials
             </h3>
             {materials.length > 0 && (
               <button
                 onClick={() => onNavigateTab('library')}
-                className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1"
+                className="text-sm font-semibold text-violet-400 hover:text-violet-300 flex items-center gap-1.5 transition-colors"
               >
-                View all <ArrowRight className="w-3 h-3" />
+                View all <ArrowRight className="w-4 h-4" />
               </button>
             )}
           </div>
 
           {materials.length === 0 ? (
-            <div className="py-8 text-center text-slate-500">
-              <FileBox className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-xs">No materials yet</p>
-              <button onClick={onUploadClick} className="btn btn-secondary text-xs py-1.5 px-3 mt-3">
+            <div className="py-16 text-center text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl">
+              <FileBox className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p className="text-sm mb-4">Your study library is empty.</p>
+              <button onClick={onUploadClick} className="btn btn-secondary">
                 Upload your first document
               </button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {materials.slice(0, 4).map((m) => {
+            <div className="space-y-4">
+              {materials.slice(0, 5).map((m) => {
                 const isActive = m.id === activeDocId;
                 return (
                   <div
                     key={m.id}
                     onClick={() => setActiveDocId(m.id)}
-                    className={`px-4 py-3 rounded-xl border cursor-pointer transition flex items-center justify-between ${
+                    className={`p-5 rounded-2xl border cursor-pointer transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                       isActive
-                        ? 'bg-violet-950/20 border-violet-500/40'
-                        : 'bg-slate-900/30 border-slate-800/60 hover:border-slate-700'
+                        ? 'bg-violet-900/10 border-violet-500/50 shadow-md shadow-violet-900/10'
+                        : 'bg-slate-900/20 border-slate-800/60 hover:border-slate-700 hover:bg-slate-800/40'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="text-sm text-white truncate">{m.name}</div>
-                        <div className="text-[11px] text-slate-500">{m.type} · {m.size_kb} KB</div>
+                    <div className="flex items-start sm:items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-violet-500/20 text-violet-400' : 'bg-slate-800 text-slate-400'}`}>
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-base font-semibold text-white mb-1 line-clamp-1">
+                          {m.name}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-2">
+                          <span className="uppercase tracking-wider font-mono">{m.type}</span>
+                          <span>•</span>
+                          <span>{m.size_kb} KB</span>
+                          <span>•</span>
+                          <span>{m.upload_time}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                    <div className="flex items-center gap-2 sm:ml-4">
                       <button
                         onClick={(e) => { e.stopPropagation(); setActiveDocId(m.id); onNavigateTab('notes'); }}
-                        className="text-[11px] text-slate-400 hover:text-violet-300 px-2 py-1 rounded hover:bg-slate-800 transition"
+                        className="btn btn-secondary py-1.5 px-3 text-xs bg-slate-800/50 hover:bg-slate-700 hover:text-white"
                       >
                         Notes
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setActiveDocId(m.id); onNavigateTab('flashcards'); }}
-                        className="text-[11px] text-slate-400 hover:text-violet-300 px-2 py-1 rounded hover:bg-slate-800 transition"
+                        className="btn btn-secondary py-1.5 px-3 text-xs bg-slate-800/50 hover:bg-slate-700 hover:text-white"
                       >
                         Cards
                       </button>
@@ -149,33 +171,34 @@ export default function DashboardView({
           )}
         </div>
 
-        {/* Snapshot */}
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-4">
-            <Award className="w-4 h-4 text-emerald-400" />
+        {/* Snapshot (Narrower Column) */}
+        <div className="glass-card p-8 flex flex-col">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2.5 mb-8">
+            <Award className="w-5 h-5 text-emerald-400" />
             Learning Snapshot
           </h3>
 
-          <div className="space-y-3">
+          <div className="space-y-6 flex-grow">
             {[
-              { label: 'Documents', value: materials.length, color: 'text-white' },
-              { label: 'Quiz Accuracy', value: `${progress?.average_quiz_score ?? 0}%`, color: 'text-emerald-400' },
-              { label: 'Total Flashcards', value: progress?.total_flashcards ?? 0, color: 'text-violet-300' },
-              { label: 'Total Quizzes', value: progress?.total_quizzes ?? 0, color: 'text-cyan-300' },
+              { label: 'Documents Processed', value: materials.length, color: 'text-white' },
+              { label: 'Average Quiz Score', value: `${progress?.average_quiz_score ?? 0}%`, color: 'text-emerald-400' },
+              { label: 'Flashcards Generated', value: progress?.total_flashcards ?? 0, color: 'text-violet-400' },
+              { label: 'Quizzes Taken', value: progress?.total_quizzes ?? 0, color: 'text-cyan-400' },
             ].map(({ label, value, color }) => (
-              <div key={label} className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">{label}</span>
-                <span className={`font-semibold font-mono ${color}`}>{value}</span>
+              <div key={label} className="bg-slate-900/30 p-4 rounded-xl border border-slate-800/50 flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-400">{label}</span>
+                <span className={`text-xl font-bold font-mono ${color}`}>{value}</span>
               </div>
             ))}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800/60">
+          <div className="mt-8">
             <button
               onClick={() => onNavigateTab('progress')}
-              className="w-full text-xs text-slate-400 hover:text-violet-300 flex items-center justify-center gap-1.5 py-1.5 rounded-lg hover:bg-slate-800/50 transition"
+              className="w-full btn btn-secondary py-3 flex items-center justify-center gap-2 group"
             >
-              Detailed Analytics <ArrowRight className="w-3 h-3" />
+              <span>View Full Analytics</span>
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
             </button>
           </div>
         </div>

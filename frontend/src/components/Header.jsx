@@ -25,32 +25,32 @@ export default function Header({
   const title = TAB_TITLES[activeTab] || 'StudyVerse';
 
   return (
-    <header className="border-b border-slate-800/60 bg-[#0f172a]/80 backdrop-blur-sm sticky top-0 z-20 px-6 py-3">
+    <header className="border-b border-slate-800/40 bg-[#0a0a0f]/80 backdrop-blur-md sticky top-0 z-20 px-8 py-5">
       {errorMessage && (
-        <div className="bg-rose-950/60 border border-rose-800/60 text-rose-300 px-3 py-2 rounded-lg text-xs flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+        <div className="bg-rose-950/40 border border-rose-800/40 text-rose-300 px-4 py-2.5 rounded-xl text-sm flex items-center justify-between mb-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             <span>{errorMessage}</span>
           </div>
-          <button onClick={onClearError} className="text-rose-400 hover:text-white font-bold ml-4 text-sm">×</button>
+          <button onClick={onClearError} className="text-rose-400 hover:text-rose-200 transition-colors ml-4 text-lg leading-none">×</button>
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-white">{title}</h1>
+        <h1 className="text-2xl font-bold text-white tracking-tight">{title}</h1>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-4">
           {activeDoc && (
-            <span className="hidden md:inline text-xs text-slate-400 bg-slate-800/60 px-3 py-1.5 rounded-lg truncate max-w-[200px]">
+            <span className="hidden md:inline text-sm font-medium text-slate-400 bg-slate-900/50 px-4 py-2 rounded-xl border border-slate-800/50 truncate max-w-[250px] shadow-sm">
               {activeDoc.name}
             </span>
           )}
 
           <button
             onClick={onUploadClick}
-            className="btn btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
+            className="btn btn-primary text-sm py-2 px-5 flex items-center gap-2 shadow-lg shadow-violet-500/20"
           >
-            <Upload className="w-3.5 h-3.5" />
+            <Upload className="w-4 h-4" />
             <span>Upload</span>
           </button>
         </div>
