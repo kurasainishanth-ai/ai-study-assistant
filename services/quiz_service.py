@@ -159,8 +159,8 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
             
         try:
             raw = call_gemini_with_retry(contents=[llm_prompt], temperature=0.1)
-            raw = re.sub(r'^`(?:json)?', '', raw.strip()).strip()
-            raw = re.sub(r'`, '', raw).strip()
+            raw = re.sub(r'^```(?:json)?', '', raw.strip()).strip()
+            raw = re.sub(r'```$', '', raw).strip()
             llm_results = json.loads(raw)
             if isinstance(llm_results, list):
                 for res in llm_results:
@@ -206,8 +206,8 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
         misconception_map = {}
         try:
             raw = call_gemini_with_retry(contents=[misconception_prompt], temperature=0.25)
-            raw = re.sub(r'^`(?:json)?', '', raw.strip()).strip()
-            raw = re.sub(r'`, '', raw).strip()
+            raw = re.sub(r'^```(?:json)?', '', raw.strip()).strip()
+            raw = re.sub(r'```$', '', raw).strip()
             mc_items = json.loads(raw)
             if isinstance(mc_items, list):
                 for mc in mc_items:
@@ -225,7 +225,7 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
                     ev['targeted_follow_up'] = mc.get('follow_up', '')
 
         if misconception_map:
-            summary_parts = [f"� {mc['misconception']}" for mc in misconception_map.values() if mc.get('misconception')]
+            summary_parts = [f" {mc['misconception']}" for mc in misconception_map.values() if mc.get('misconception')]
             misconception_analysis_text = "\n".join(summary_parts) if summary_parts else "Review incorrect answers above."
         else:
             misconception_analysis_text = "Review your incorrect answers and their explanations to clarify definitions."
@@ -307,12 +307,12 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
             "explanation": q.get("rationale", q.get("explanation", "")),
             "topic": topic,
             "source_ref": q.get("source_ref", ""),
-            # Per-item misconception and follow_up placeholders — filled below
+            # Per-item misconception and follow_up placeholders â filled below
             "misconception_analysis": None,
             "targeted_follow_up": None,
         })
 
-    # Misconception Detector — analyze incorrect answers with Gemini
+    # Misconception Detector â analyze incorrect answers with Gemini
     incorrect_evals = [e for e in evaluations if not e["is_correct"]]
 
     if incorrect_evals:
@@ -332,7 +332,7 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
             '    "follow_up": "one targeted follow-up checkpoint question"\n'
             "  }\n"
             "]\n"
-            "Return only pure JSON — no markdown fences, no extra text.\n\n"
+            "Return only pure JSON â no markdown fences, no extra text.\n\n"
             f"STUDENT ERRORS:\n{error_summary}"
         )
 
@@ -348,7 +348,7 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
                     key = mc.get("question", "").strip().lower()[:60]
                     misconception_map[key] = mc
         except Exception:
-            pass  # silently degrade — evaluations still work without misconception text
+            pass  # silently degrade â evaluations still work without misconception text
 
         # Attach per-question misconception data
         for ev in evaluations:
@@ -364,7 +364,7 @@ def evaluate_quiz(doc_id: str, questions: List[Dict[str, Any]], user_answers: Di
             summary_parts = []
             for mc in misconception_map.values():
                 if mc.get("misconception"):
-                    summary_parts.append(f"• {mc['misconception']}")
+                    summary_parts.append(f"â¢ {mc['misconception']}")
             misconception_analysis_text = "\n".join(summary_parts) if summary_parts else "Review incorrect answers above."
         else:
             misconception_analysis_text = "Review your incorrect answers and their explanations to clarify definitions."
