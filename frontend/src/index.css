@@ -152,7 +152,8 @@ button { cursor: pointer; }
    ================================================================ */
 
 .shell {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
 }
@@ -162,6 +163,7 @@ aside {
   padding: 30px 16px 18px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 .brand {
   display: flex;
@@ -218,7 +220,7 @@ aside .label { color: #84948a; margin: 0 12px 12px; }
 .tip b { display: block; color: #fff; font-size: 12px; }
 .tip span { color: #b9c8c0; }
 .add { width: 100%; }
-main { min-width: 0; }
+main { min-width: 0; height: 100dvh; overflow-y: auto; }
 
 /* ================================================================
    HEADER
@@ -683,18 +685,31 @@ header h1 {
 .render-quiz-result { }
 .score-banner {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+}
+.score-wrap {
+  display: flex;
   align-items: baseline;
-  gap: 14px;
-  padding: 18px 0 24px;
+  gap: 16px;
 }
 .score-big {
-  font: 700 36px 'Playfair Display', serif;
+  font: 700 42px 'Playfair Display', serif;
   color: var(--fg);
+  line-height: 1;
 }
 .score-pct {
   font-size: 18px;
   font-weight: 700;
-  color: var(--success);
+  color: var(--rating-know);
+  background: rgba(16, 185, 129, 0.1);
+  padding: 4px 12px;
+  border-radius: 20px;
 }
 .quiz-detail {
   padding: 18px 20px;

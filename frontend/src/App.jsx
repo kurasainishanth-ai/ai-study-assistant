@@ -377,6 +377,7 @@ export default function App() {
   const [materials, setMaterials] = useState([]);
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [notice, setNotice] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [cache, setCache] = useState({});          // keyed "docId_toolId"
@@ -540,6 +541,7 @@ function Library({ materials, selected, choose, refresh, warn, upload }) {
 function Studio({ selected, choose, cache, setCache, warn, go }) {
   const [mode, setMode] = useState(null); // Null = Landing Overview
   const [busy, setBusy] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
 
   const tool = mode ? TOOLS.find((t) => t.id === mode) : null;
@@ -715,6 +717,7 @@ function Tutor({ selected }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -734,6 +737,22 @@ function Tutor({ selected }) {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  
+  const clearChat = async () => {
+    if (!selected || messages.length === 0) return;
+    if (confirm("Are you sure you want to clear this conversation? This action cannot be undone.")) {
+       setClearing(true);
+       try {
+         await api.clearTutorHistory(selected.id);
+         setMessages([]);
+       } catch (err) {
+         alert("Failed to clear chat: " + err.message);
+       } finally {
+         setClearing(false);
+       }
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -756,9 +775,16 @@ function Tutor({ selected }) {
     <section className="page tutor-page">
       {/* Active-document indicator */}
       <div className="source">
-        <Brain size={18} />
-        <small>GROUNDING ANSWERS IN</small>
-        <b>{selected?.name || "Choose a source in your library"}</b>
+        <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1}}>
+          <Brain size={18} />
+          <small>GROUNDING ANSWERS IN</small>
+          <b>{selected?.name || "Choose a source in your library"}</b>
+        </div>
+        {selected && messages.length > 0 && (
+          <button className="btn-ghost" disabled={busy || clearing} onClick={clearChat} style={{marginLeft:'auto'}}>
+            <Trash2 size={16} /> Clear Chat
+          </button>
+        )}
       </div>
 
       {/* Chat area — full width, no preview panel */}
