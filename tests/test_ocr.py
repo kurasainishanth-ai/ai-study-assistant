@@ -14,7 +14,7 @@ class TestOCRIntegration(unittest.TestCase):
         result = ocr_image(img)
         self.assertIn("Mocked OCR Handwritten Text", result)
 
-    @patch('extractors.image_extractor.ocr_image')
+    @patch('services.ocr_service.ocr_image')
     @patch('extractors.image_extractor.Image.open')
     @patch('os.path.exists')
     def test_image_extractor(self, mock_exists, mock_open, mock_ocr):

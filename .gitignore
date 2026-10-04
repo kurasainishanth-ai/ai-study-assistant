@@ -22,3 +22,5 @@ studyverse.db
 # Frontend
 frontend/node_modules/
 frontend/dist/
+
+.venv_old/
