@@ -38,6 +38,8 @@ from services.flashcard_service import generate_flashcards
 from services.quiz_service import generate_quiz, evaluate_quiz
 from services.knowledge_map_service import generate_knowledge_map
 from services.visual_service import explain_visual_diagram, generate_concept_illustration
+from services.infographic_service import generate_infographic, INFOGRAPHIC_TYPES
+from services.scheduler_service import get_material_topics, generate_revision_plan
 
 # Initialize SQLite database on startup
 db.init_db()
@@ -105,6 +107,22 @@ class VisualArtRequest(BaseModel):
 
 class RenameMaterialRequest(BaseModel):
     new_name: str
+
+class InfographicRequest(BaseModel):
+    doc_id: str
+    infographic_type: str = "concept_overview"
+
+class GeneratePlanRequest(BaseModel):
+    doc_id: str
+    exam_date: str
+    daily_hours: float = 2.0
+    start_date: Optional[str] = None
+    topic_overrides: Optional[Dict[str, str]] = None
+
+class TaskStatusRequest(BaseModel):
+    doc_id: str
+    task_id: str
+    completed: bool
 
 
 # --- Helper ---
@@ -545,4 +563,101 @@ def delete_chat_session_endpoint(chat_id: str):
     """Deletes a chat session and its history."""
     db.delete_chat_session(chat_id)
     return {"success": True}
+
+
+# =========================================================
+# 10. Infographic Generator (feature/yagnesh)
+# =========================================================
+
+@app.get("/api/infographic/types")
+def get_infographic_types():
+    """Returns the available infographic types and metadata."""
+    return {
+        "types": [
+            {"key": k, "title": v["title"], "description": v["description"]}
+            for k, v in INFOGRAPHIC_TYPES.items()
+        ]
+    }
+
+@app.get("/api/infographic/{doc_id}")
+def get_infographic_endpoint(doc_id: str):
+    """Restores the last generated infographic for a document."""
+    saved = db.get_infographic(doc_id)
+    return saved or {"doc_id": doc_id, "data": None}
+
+@app.post("/api/infographic/generate")
+def generate_infographic_endpoint(req: InfographicRequest):
+    """Generates a structured, source-grounded visual infographic from study material."""
+    try:
+        result = generate_infographic(req.doc_id, req.infographic_type)
+        return result
+    except GeminiClientAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except GeminiServiceAuthError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except (GeminiQuotaExhaustedError, GeminiServiceQuotaExhaustedError) as e:
+        raise HTTPException(status_code=429, detail=f"API quota exhausted: {str(e)}")
+    except (GeminiRateLimitError, GeminiServiceRateLimitError) as e:
+        raise HTTPException(status_code=429, detail=f"Rate limit reached, please try again shortly: {str(e)}")
+    except (GeminiTemporaryUnavailableError, GeminiServiceTemporaryError) as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Infographic generation error: {str(e)}")
+
+
+# =========================================================
+# 11. Smart Revision Scheduler (feature/yagnesh)
+# =========================================================
+
+@app.get("/api/scheduler/topics/{doc_id}")
+def get_scheduler_topics_endpoint(doc_id: str):
+    """Returns genuine document topics annotated with real quiz scores."""
+    try:
+        return get_material_topics(doc_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Topic extraction error: {str(e)}")
+
+
+@app.get("/api/scheduler/{doc_id}")
+def get_scheduler_plan_endpoint(doc_id: str):
+    """Restores the saved revision plan for a document."""
+    saved = db.get_revision_plan(doc_id)
+    return saved or {"doc_id": doc_id, "plan_data": None}
+
+
+@app.post("/api/scheduler/generate")
+def generate_scheduler_plan_endpoint(req: GeneratePlanRequest):
+    """Generates an adaptive spaced revision plan tailored to the exam date and weak topics."""
+    try:
+        plan = generate_revision_plan(
+            doc_id=req.doc_id,
+            exam_date_str=req.exam_date,
+            daily_hours=req.daily_hours,
+            start_date_str=req.start_date,
+            topic_overrides=req.topic_overrides
+        )
+        return plan
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Scheduler plan generation error: {str(e)}")
+
+
+@app.post("/api/scheduler/task-status")
+def update_task_status_endpoint(req: TaskStatusRequest):
+    """Updates the completion status of a revision task and recalculates progress."""
+    try:
+        updated = db.update_revision_task_status(req.doc_id, req.task_id, req.completed)
+        if not updated:
+            raise HTTPException(status_code=404, detail=f"Revision plan or task not found for '{req.doc_id}'.")
+        return updated
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Task status update error: {str(e)}")
+
 

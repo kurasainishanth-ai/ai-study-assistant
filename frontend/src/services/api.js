@@ -65,4 +65,18 @@ export const api = {
 
   // Progress
   progress: () => request("/progress/analytics"),
+
+  // Infographic Generator
+  generateInfographic: (id, infographicType = "concept_overview") =>
+    request("/infographic/generate", json({ doc_id: id, infographic_type: infographicType })),
+  getInfographic: (id) => request("/infographic/" + encodeURIComponent(id)),
+  getInfographicTypes: () => request("/infographic/types"),
+
+  // Revision Scheduler (feature/yagnesh)
+  getRevisionPlan: (id) => request("/scheduler/" + encodeURIComponent(id)),
+  getRevisionTopics: (id) => request("/scheduler/topics/" + encodeURIComponent(id)),
+  generateRevisionPlan: (data) => request("/scheduler/generate", json(data)),
+  updateRevisionTaskStatus: (docId, taskId, completed) =>
+    request("/scheduler/task-status", json({ doc_id: docId, task_id: taskId, completed })),
 };
+
