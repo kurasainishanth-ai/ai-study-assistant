@@ -1,5 +1,10 @@
 import os
 import sys
+
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
 from extractors import extract_content, SUPPORTED_EXTENSIONS
 from summarizer import generate_study_summary, SUMMARY_STYLES
 from config import GEMINI_API_KEY

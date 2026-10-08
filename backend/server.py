@@ -1,8 +1,12 @@
+import sys
 import os
 import tempfile
 import time
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+
+# Ensure backend directory is in sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware

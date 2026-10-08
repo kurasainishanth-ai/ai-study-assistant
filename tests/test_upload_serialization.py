@@ -1,4 +1,7 @@
-﻿import unittest
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend')))
+
+import unittest
 import json
 from fastapi.testclient import TestClient
 from unittest.mock import patch

@@ -1,4 +1,7 @@
-﻿import unittest
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend')))
+
+import unittest
 from agent.parser import parse_model_response
 
 class TestAgentParser(unittest.TestCase):
