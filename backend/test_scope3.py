@@ -1,0 +1,48 @@
+from unittest.mock import patch
+import sys
+sys.path.append(r'C:\Users\kuras\Desktop\ai-study-assistant\backend')
+from services.ai_tutor import ask_ai_tutor
+import db
+
+def mock_get_material(doc_id):
+    if doc_id == 'doc_ml':
+        return {
+            'id': 'doc_ml',
+            'name': 'ML Guide',
+            'content': 'Normalization scales data to [0,1] or standardizes it. This helps algorithms converge faster.'
+        }
+    return None
+
+@patch('db.get_material', side_effect=mock_get_material)
+@patch('db.get_chat_history', return_value=[])
+@patch('db.save_chat_message', return_value=None)
+@patch('db.get_chat_session', return_value=None)
+@patch('db.ensure_chat_session', return_value=None)
+@patch('db.get_all_materials', return_value=[])
+def run_tests(*args):
+    with open('test_results.txt', 'w', encoding='utf-8') as f:
+        f.write("=== A. NO DOCUMENT / NEW CHAT ===\n")
+        tests_a = [
+            "Explain gradient descent.",
+            "Teach me binary trees.",
+            "Help me understand backpropagation.",
+            "What movies should I watch?",
+            "Which phone should I buy?"
+        ]
+        for q in tests_a:
+            f.write(f"\nQ: {q}\n")
+            r = ask_ai_tutor('chat_new', q)
+            f.write(f"A: {r['answer']}\n")
+
+        f.write("\n\n=== B. DOCUMENT AVAILABLE ===\n")
+        tests_b = [
+            "Explain normalization from this PDF.",
+            "The PDF doesn't explain why normalization reduces redundancy. Explain why.",
+            "Recommend some movies."
+        ]
+        for q in tests_b:
+            f.write(f"\nQ: {q}\n")
+            r = ask_ai_tutor('chat_withdoc', q, source_doc_id='doc_ml')
+            f.write(f"A: {r['answer']}\n")
+
+run_tests()
