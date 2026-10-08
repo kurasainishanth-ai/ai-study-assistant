@@ -1,11 +1,18 @@
-google-genai>=2.26.0
-python-dotenv>=1.2.0
-pypdf>=6.19.0
-PyMuPDF>=1.28.0
-python-pptx>=1.0.2
-python-docx>=1.2.0
-pillow>=12.3.0
-streamlit>=1.64.0
+# Core FastAPI Backend & Server
 fastapi>=0.115.0
-uvicorn>=0.30.0
+uvicorn[standard]>=0.30.0
 python-multipart>=0.0.12
+python-dotenv>=1.0.0
+
+# Gemini AI SDK
+google-genai>=0.1.0
+
+# Document & Multimodal Content Extractors
+pypdf>=4.0.0
+PyMuPDF>=1.23.0
+python-pptx>=0.6.21
+python-docx>=1.1.0
+pillow>=10.0.0
+
+# Optional CLI / Legacy Utilities
+streamlit>=1.30.0

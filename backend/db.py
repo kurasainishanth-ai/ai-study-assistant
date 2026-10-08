@@ -4,7 +4,7 @@ import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 
-DB_PATH = "studyverse.db"
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "studyverse.db"))
 
 def get_connection():
     """Returns an active SQLite connection with row factory."""

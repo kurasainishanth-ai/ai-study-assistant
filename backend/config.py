@@ -2,11 +2,18 @@ import os
 from dotenv import load_dotenv
 from google import genai
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (checks both backend dir and project root)
+_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+if os.path.exists(_env_path):
+    load_dotenv(dotenv_path=_env_path, override=True)
+else:
+    load_dotenv(override=True)
 
 def get_gemini_api_key() -> str:
-    load_dotenv(override=True)
+    if os.path.exists(_env_path):
+        load_dotenv(dotenv_path=_env_path, override=True)
+    else:
+        load_dotenv(override=True)
     return os.getenv("GEMINI_API_KEY", "").strip()
 
 GEMINI_API_KEY = get_gemini_api_key()
