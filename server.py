@@ -84,6 +84,7 @@ class TutorChatRequest(BaseModel):
     doc_id: str
     message: str
     level: str = "intermediate"  # simple, intermediate, university
+    source_doc_id: Optional[str] = None
 
 class QuizGenerateRequest(BaseModel):
     doc_id: str
@@ -393,12 +394,15 @@ def tutor_chat_endpoint(req: TutorChatRequest):
         # ask_ai_tutor is the source-grounded path that records both messages
         # and returns usable citations.  The former agent call discarded this
         # state, making the history endpoint appear broken.
-        result = ask_ai_tutor(req.doc_id, req.message, req.level)
+        result = ask_ai_tutor(req.doc_id, req.message, req.level, source_doc_id=req.source_doc_id)
         return {
+            'chat_id': req.doc_id,
             'content': result.get('answer', ''),
             'response': result.get('answer', ''),
             'citations': result.get('citations', []),
             'level': req.level,
+            'source_doc_id': result.get('source_doc_id'),
+            'source_name': result.get('source_name'),
             'raw_agent_response': None
         }
     except GeminiClientAuthError as e:
@@ -523,4 +527,18 @@ def list_recent_chats():
     except Exception as e:
         logger.error(f"Error fetching chats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/chats/{chat_id}")
+def get_chat_session_endpoint(chat_id: str):
+    """Gets metadata for a specific chat session."""
+    session = db.get_chat_session(chat_id)
+    if not session:
+        raise HTTPException(status_code=404, detail=f"Chat session '{chat_id}' not found.")
+    return session
+
+@app.delete("/api/chats/{chat_id}")
+def delete_chat_session_endpoint(chat_id: str):
+    """Deletes a chat session and its history."""
+    db.delete_chat_session(chat_id)
+    return {"success": True}
 

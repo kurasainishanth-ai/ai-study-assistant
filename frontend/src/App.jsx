@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  BookOpen, Brain, ChevronLeft, ChevronRight, FilePlus2, GraduationCap,
+  BookOpen, Brain, ChevronLeft, ChevronRight, ChevronDown, FilePlus2, GraduationCap,
   LayoutDashboard, LoaderCircle, MessageCircle, Plus, RefreshCw, Send,
   Sparkles, Trash2, Upload, WandSparkles, X, RotateCcw,
   CheckCircle2, XCircle, Map as MapIcon, Layers, FileText,
@@ -369,6 +369,204 @@ const TOOLS = [
 ];
 
 /* ------------------------------------------------------------------ */
+/*  Source Selection Custom Dropdown                                   */
+/* ------------------------------------------------------------------ */
+
+function SourceSelectDropdown({ materials, selectedSourceIds, onToggleSource, onSelectAll, onDeleteSource }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const allSelected = materials && materials.length > 0 && selectedSourceIds.length === materials.length;
+  const isNoneSelected = selectedSourceIds.length === 0;
+
+  let label = "All Workspace Materials";
+  if (isNoneSelected) {
+    label = "All Workspace Materials";
+  } else if (allSelected) {
+    label = `All Materials (${materials.length})`;
+  } else if (selectedSourceIds.length === 1) {
+    const firstMat = materials.find((m) => m.id === selectedSourceIds[0]);
+    label = firstMat ? firstMat.name : "1 Material Selected";
+  } else {
+    const firstMat = materials.find((m) => m.id === selectedSourceIds[0]);
+    label = firstMat ? `${firstMat.name} (+${selectedSourceIds.length - 1} more)` : `${selectedSourceIds.length} Materials Selected`;
+  }
+
+  return (
+    <div className="source-select-dropdown" ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: 'var(--bg-2, rgba(255,255,255,0.07))',
+          color: 'var(--fg-1, inherit)',
+          border: '1px solid var(--border, rgba(255,255,255,0.15))',
+          borderRadius: '8px',
+          padding: '6px 12px',
+          fontSize: '13px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          maxWidth: '340px',
+          outline: 'none'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          📄 {label}
+        </span>
+        <ChevronDown size={14} style={{ flexShrink: 0, opacity: 0.7, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            zIndex: 999,
+            minWidth: '280px',
+            maxWidth: '360px',
+            background: 'var(--surface, #1e293b)',
+            border: '1px solid var(--border, rgba(255,255,255,0.15))',
+            borderRadius: '10px',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
+            padding: '6px',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Header Action: All Materials */}
+          <div
+            onClick={onSelectAll}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justify: 'space-between',
+              padding: '8px 10px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 600,
+              background: allSelected ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+              color: allSelected ? 'var(--primary, #10b981)' : 'var(--fg-1)',
+              marginBottom: '4px',
+              borderBottom: '1px solid var(--border, rgba(255,255,255,0.08))'
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '4px',
+                  border: '1px solid ' + (allSelected ? 'var(--primary, #10b981)' : 'var(--fg-3)'),
+                  background: allSelected ? 'var(--primary, #10b981)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'center'
+                }}
+              >
+                {allSelected && <Check size={12} color="#fff" />}
+              </div>
+              🌐 All Workspace Materials
+            </span>
+          </div>
+
+          {/* List of Materials */}
+          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+            {!materials || materials.length === 0 ? (
+              <small style={{ display: 'block', padding: '10px', color: 'var(--fg-3)', fontSize: '12px', textAlign: 'center' }}>
+                No materials uploaded yet
+              </small>
+            ) : (
+              materials.map((m) => {
+                const isSelected = selectedSourceIds.includes(m.id);
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => onToggleSource(m.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justify: 'space-between',
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12.5px',
+                      marginBottom: '2px',
+                      background: isSelected ? 'rgba(255,255,255,0.06)' : 'transparent',
+                      transition: 'background 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                      <div
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '4px',
+                          border: '1px solid ' + (isSelected ? 'var(--primary, #10b981)' : 'var(--fg-3)'),
+                          background: isSelected ? 'var(--primary, #10b981)' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justify: 'center',
+                          flexShrink: 0
+                        }}
+                      >
+                        {isSelected && <Check size={11} color="#fff" />}
+                      </div>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {m.name}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteSource(m.id);
+                      }}
+                      title="Delete material"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--fg-3)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justify: 'center',
+                        borderRadius: '4px',
+                        marginLeft: '6px',
+                        flexShrink: 0
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--fg-3)'}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  App Root                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -377,6 +575,7 @@ export default function App() {
   const [materials, setMaterials] = useState([]);
   const [chats, setChats] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [selectedSourceIds, setSelectedSourceIds] = useState([]);
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [notice, setNotice] = useState("");
@@ -386,29 +585,100 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api.materials();
+      const [data, chatsData] = await Promise.all([
+        api.materials(),
+        api.getRecentChats().catch(() => null),
+      ]);
       setMaterials(data);
-      if (!selected) setSelected(data[0] || null);
-      
-      try {
-        const chatsData = await api.getRecentChats();
-        setChats(chatsData || []);
-      } catch(e) {}
+      setSelected((prev) => prev ?? data[0] ?? null);
+      if (chatsData) setChats(chatsData);
+
+      setSelectedSourceIds((prev) => {
+        if (!data || data.length === 0) return [];
+        if (prev.length === 0) return data.map((m) => m.id);
+        return prev.filter((id) => data.some((m) => m.id === id));
+      });
     } catch (e) { setNotice(e.message); }
-  }, [selected]);
+  }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  const onToggleSource = (id) => {
+    setSelectedSourceIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const onSelectAllSources = () => {
+    if (selectedSourceIds.length === materials.length) {
+      setSelectedSourceIds([]);
+    } else {
+      setSelectedSourceIds(materials.map((m) => m.id));
+    }
+  };
+
+  const onDeleteSource = async (id) => {
+    const mat = materials.find((m) => m.id === id);
+    if (mat && !confirm(`Remove '${mat.name}' from your library?`)) return;
+    try {
+      await api.remove(id);
+      setSelectedSourceIds((prev) => prev.filter((x) => x !== id));
+      await refresh();
+    } catch (e) {
+      setNotice(e.message);
+    }
+  };
+
   
+  // Lightweight sidebar-only refresh — called after every message send
+  const refreshChats = useCallback(async () => {
+    try {
+      const chatsData = await api.getRecentChats();
+      if (chatsData) setChats(chatsData);
+    } catch (_) {}
+  }, []);
+
   const createNewChat = () => {
+    // Associate the currently active material as source if any material is selected
+    const currentSourceId = selected && !selected.is_chat ? selected.id : (selected?.source_doc_id || materials[0]?.id || null);
+    const currentSourceName = selected && !selected.is_chat ? selected.name : (selected?.source_name || materials[0]?.name || null);
+    
     const newId = "chat_" + Date.now();
-    setSelected({ id: newId, name: "New Chat", is_chat: true });
+    setSelected({
+      id: newId,
+      name: "New Chat",
+      source_doc_id: currentSourceId,
+      source_name: currentSourceName,
+      is_chat: true
+    });
     setView("tutor");
   };
 
   const selectChat = (chat) => {
-    setSelected({ id: chat.id, name: chat.title, is_chat: true });
+    setSelected({
+      id: chat.id,
+      name: chat.title,
+      source_doc_id: chat.source_doc_id || (chat.is_doc_chat ? chat.id : null),
+      source_name: chat.source_name || (chat.is_doc_chat ? chat.title : null),
+      is_chat: true
+    });
     setView("tutor");
+  };
+
+  const deleteChatSession = async (e, chatId) => {
+    e.stopPropagation();
+    try {
+      await Promise.all([
+        api.clearTutorHistory(chatId).catch(() => null),
+        api.deleteChatSession(chatId).catch(() => null),
+      ]);
+      if (selected?.id === chatId) {
+        createNewChat();
+      }
+      refreshChats();
+    } catch (err) {
+      setNotice("Failed to delete chat: " + err.message);
+    }
   };
 
   const upload = async (file) => {
@@ -417,6 +687,28 @@ export default function App() {
     try { await api.upload(file); await refresh(); setShowUpload(false); setView("library"); }
     catch (e) { setNotice(e.message); }
     finally { setBusy(false); }
+  };
+
+  const handleNavClick = (id) => {
+    if (id === "tutor") {
+      // Always open a fresh/new chat interface by default when clicking AI Tutor nav item
+      createNewChat();
+    } else {
+      setView(id);
+    }
+  };
+
+  const handleSelectSource = (docId) => {
+    const mat = materials.find((m) => m.id === docId);
+    if (selected?.is_chat) {
+      setSelected((prev) => ({
+        ...prev,
+        source_doc_id: docId || null,
+        source_name: mat ? mat.name : null
+      }));
+    } else {
+      setSelected(mat || null);
+    }
   };
 
   const NAV = [
@@ -432,22 +724,91 @@ export default function App() {
         <div className="brand"><i><GraduationCap size={20} /></i>studylane</div>
         <small className="label">YOUR WORKSPACE</small>
         {NAV.map(([id, Icon, label]) => (
-          <button key={id} className={`nav${view === id ? " on" : ""}`} onClick={() => setView(id)}>
+          <button key={id} className={`nav${view === id ? " on" : ""}`} onClick={() => handleNavClick(id)}>
             <Icon size={17} />{label}
           </button>
         ))}
         
         <div style={{marginTop: '20px', marginBottom: '10px'}}>
-          <small className="label">RECENT CHATS</small>
-          <button className="nav" onClick={createNewChat} style={{marginTop: '4px'}}>
-            <Plus size={17} /> New Chat
-          </button>
-          <div style={{maxHeight: '150px', overflowY: 'auto', marginTop: '4px'}}>
-            {chats.map(chat => (
-              <button key={chat.id} className={`nav${selected?.id === chat.id && view === "tutor" ? " on" : ""}`} onClick={() => selectChat(chat)}>
-                <MessageCircle size={15} /> <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{chat.title || "Chat"}</span>
-              </button>
-            ))}
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginBottom: '6px'}}>
+            <small className="label" style={{marginBottom: 0}}>RECENT CHATS</small>
+            <button
+              onClick={createNewChat}
+              title="Start New Chat"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: '1px solid var(--border, rgba(255,255,255,0.15))',
+                background: 'var(--bg-2, rgba(255,255,255,0.05))',
+                color: 'var(--fg-1, inherit)',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={13} /> New Chat
+            </button>
+          </div>
+
+          <div style={{maxHeight: '220px', overflowY: 'auto', marginTop: '4px'}}>
+            {chats.filter(c => c.title && c.title !== "New Chat").length === 0 ? (
+              <small style={{display: 'block', padding: '8px 10px', color: 'var(--fg-3)', fontSize: '11px'}}>No recent chats</small>
+            ) : (
+              chats.filter(c => c.title && c.title !== "New Chat").map(chat => (
+                <div
+                  key={chat.id}
+                  className={`nav${selected?.id === chat.id && view === "tutor" ? " on" : ""}`}
+                  onClick={() => selectChat(chat)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justify: 'space-between',
+                    padding: '6px 10px',
+                    cursor: 'pointer',
+                    borderRadius: '8px',
+                    marginBottom: '2px'
+                  }}
+                >
+                  <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, overflow: 'hidden', flex: 1}}>
+                    <span style={{display:'flex', alignItems:'center', gap:6, width:'100%'}}>
+                      <MessageCircle size={14} style={{flexShrink:0}} />
+                      <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13}}>
+                        {chat.title || "Chat"}
+                      </span>
+                    </span>
+                    {chat.source_name && (
+                      <span style={{fontSize: 10, color: 'var(--fg-3)', paddingLeft: 20, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', width:'100%'}}>
+                        📄 {chat.source_name}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => deleteChatSession(e, chat.id)}
+                    title="Delete Chat"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--fg-3)',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justify: 'center',
+                      borderRadius: '4px',
+                      marginLeft: '4px',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--fg-3)'}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
         <div className="side-bottom">
@@ -467,8 +828,33 @@ export default function App() {
         {notice && <div className="notice">{notice}<button className="btn-icon" onClick={() => setNotice("")}><X size={16} /></button></div>}
         {view === "home" && <Home materials={materials} selected={selected} choose={setSelected} go={setView} upload={() => setShowUpload(true)} />}
         {view === "library" && <Library materials={materials} selected={selected} choose={setSelected} refresh={refresh} warn={setNotice} upload={() => setShowUpload(true)} />}
-        {view === "studio" && <Studio selected={selected} choose={setSelected} cache={cache} setCache={setCache} warn={setNotice} go={setView} />}
-        {view === "tutor" && <Tutor selected={selected} refresh={refresh} />}
+        {view === "studio" && (
+          <Studio
+            selected={selected}
+            choose={setSelected}
+            cache={cache}
+            setCache={setCache}
+            warn={setNotice}
+            go={setView}
+            materials={materials}
+            selectedSourceIds={selectedSourceIds}
+            onToggleSource={onToggleSource}
+            onSelectAllSources={onSelectAllSources}
+            onDeleteSource={onDeleteSource}
+          />
+        )}
+        {view === "tutor" && (
+          <Tutor
+            selected={selected}
+            refresh={refresh}
+            refreshChats={refreshChats}
+            materials={materials}
+            selectedSourceIds={selectedSourceIds}
+            onToggleSource={onToggleSource}
+            onSelectAllSources={onSelectAllSources}
+            onDeleteSource={onDeleteSource}
+          />
+        )}
       </main>
 
       {showUpload && <UploadModal busy={busy} close={() => setShowUpload(false)} choose={() => fileRef.current.click()} sample={async () => { setBusy(true); try { await api.sample(); await refresh(); setShowUpload(false); setView("library"); } catch (e) { setNotice(e.message); } finally { setBusy(false); } }} />}
@@ -570,29 +956,44 @@ function Library({ materials, selected, choose, refresh, warn, upload }) {
 /*  Studio                                                             */
 /* ------------------------------------------------------------------ */
 
-function Studio({ selected, choose, cache, setCache, warn, go }) {
+function Studio({
+  selected,
+  choose,
+  cache,
+  setCache,
+  warn,
+  go,
+  materials,
+  selectedSourceIds,
+  onToggleSource,
+  onSelectAllSources,
+  onDeleteSource
+}) {
   const [mode, setMode] = useState(null); // Null = Landing Overview
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
 
+  const activeDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
+  const activeMaterial = (materials || []).find((m) => m.id === activeDocId) || (!selected?.is_chat ? selected : null);
+
   const tool = mode ? TOOLS.find((t) => t.id === mode) : null;
   const ToolIcon = tool?.icon;
-  const ck = selected && mode ? `${selected.id}_${mode}` : null;
+  const ck = activeDocId && mode ? `${activeDocId}_${mode}` : null;
   const result = ck ? cache[ck] ?? undefined : undefined;
 
   /* Auto-restore from DB on first mount for this doc+tool */
   useEffect(() => {
-    if (!selected || !ck || !tool) return;
+    if (!activeDocId || !ck || !tool) return;
     if (cache[ck] !== undefined) return;              // already loaded
     let live = true;
     (async () => {
       setBusy(true); setError("");
       try {
-        let res = await tool.restore(selected.id);
+        let res = await tool.restore(activeDocId);
         // Fallback for quiz if no attempts found: check generated quiz
         if (mode === "quiz" && (!res || res.length === 0)) {
-           const generated = await api.getGeneratedQuiz(selected.id);
+           const generated = await api.getGeneratedQuiz(activeDocId);
            res = generated; 
         }
         
@@ -608,13 +1009,13 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
       }
     })();
     return () => { live = false; };
-  }, [selected?.id, mode]);          // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeDocId, mode]);          // eslint-disable-line react-hooks/exhaustive-deps
 
   const generate = async () => {
-    if (!selected) { warn("Choose a study material first."); return; }
+    if (!activeDocId) { warn("Choose a study material first."); return; }
     setBusy(true); setError("");
     try {
-      const res = await tool.generate(selected.id);
+      const res = await tool.generate(activeDocId);
       setCache((c) => ({ ...c, [ck]: res }));
     } catch (e) {
       setError(e.message);
@@ -642,30 +1043,47 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
   };
 
   const submitQuiz = async (questions, answers) => {
+    if (!activeDocId) return;
     setBusy(true); setError("");
     try {
-      const res = await api.submitQuiz(selected.id, questions, answers);
+      const res = await api.submitQuiz(activeDocId, questions, answers);
       setCache((c) => ({ ...c, [ck]: [res] })); // Save attempt as an array to match getQuizAttempts
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
 
   const hasResult = result !== null && result !== undefined;
 
+  const renderSourcePicker = () => (
+    <div className="source" style={{display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap'}}>
+      {mode && (
+        <button className="btn-ghost" onClick={() => setMode(null)} style={{marginRight: 10, padding: 0}}>
+          <ArrowLeft size={16} /> Back
+        </button>
+      )}
+      <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
+      <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>ACTIVE SOURCE MATERIAL</small>
+      
+      <SourceSelectDropdown
+        materials={materials}
+        selectedSourceIds={selectedSourceIds}
+        onToggleSource={onToggleSource}
+        onSelectAll={onSelectAllSources}
+        onDeleteSource={onDeleteSource}
+      />
+    </div>
+  );
+
   // Render Landing Page
   if (!mode) {
     return (
       <section className="page studio-landing">
-        <div className="source">
-          <small>ACTIVE SOURCE</small>
-          <b>{selected?.name || "No material selected"}</b>
-          {selected && <button className="btn-ghost" onClick={() => choose(null)}>Clear source</button>}
-        </div>
+        {renderSourcePicker()}
         <div className="landing-hero" style={{textAlign:'center', padding: '60px 20px'}}>
           <WandSparkles size={48} style={{color:'var(--accent)', marginBottom: 20}} />
           <h2 style={{fontSize: 32, marginBottom: 10, letterSpacing: '-1px'}}>Study Studio</h2>
           <p style={{color: 'var(--fg-2)', maxWidth: 400, margin: '0 auto 40px'}}>
-            {selected 
-              ? `Select a tool below to generate study material from "${selected.name}".`
+            {activeMaterial 
+              ? `Select a tool below to generate study material from "${activeMaterial.name}".`
               : "Please select or upload a material in your Library first."}
           </p>
           <div className="tool-grid" style={{display:'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, maxWidth: 900, margin: '0 auto'}}>
@@ -675,9 +1093,9 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
                 <button 
                   key={t.id} 
                   className="tool-card"
-                  disabled={!selected}
+                  disabled={!activeDocId}
                   onClick={() => setMode(t.id)}
-                  style={{background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-lg)', textAlign: 'left', transition: 'border-color 0.2s, transform 0.1s', cursor: selected ? 'pointer' : 'not-allowed', opacity: selected ? 1 : 0.6}}
+                  style={{background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-lg)', textAlign: 'left', transition: 'border-color 0.2s, transform 0.1s', cursor: activeDocId ? 'pointer' : 'not-allowed', opacity: activeDocId ? 1 : 0.6}}
                 >
                   <TIcon size={24} style={{color: 'var(--green)', marginBottom: 16}} />
                   <h3 style={{fontSize: 16, margin: '0 0 8px'}}>{t.label}</h3>
@@ -686,7 +1104,7 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
               )
             })}
           </div>
-          {!selected && (
+          {!activeDocId && (
             <button className="btn-primary" onClick={() => go('library')} style={{marginTop: 40}}>Go to Library</button>
           )}
         </div>
@@ -697,12 +1115,7 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
   // Render specific tool
   return (
     <section className="page">
-      <div className="source">
-        <button className="btn-ghost" onClick={() => setMode(null)} style={{marginRight: 10, padding: 0}}><ArrowLeft size={16} /> Back</button>
-        <small>ACTIVE SOURCE</small>
-        <b>{selected?.name || "No material selected"}</b>
-        {selected && <button className="btn-ghost" onClick={() => choose(null)}>Clear</button>}
-      </div>
+      {renderSourcePicker()}
 
       <div className="studio tool-active-layout" style={{display: 'block', padding: '40px 60px'}}>
         <div className="work" style={{maxWidth: '100%', padding: 0}}>
@@ -714,7 +1127,7 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
             </div>
             <div className="work-actions">
               {!hasResult && (
-                <button className="btn-primary" disabled={!selected || busy} onClick={generate}>
+                <button className="btn-primary" disabled={!activeDocId || busy} onClick={generate}>
                   {busy ? <><LoaderCircle className="spin" size={16} /> Generating…</> : <><WandSparkles size={16} /> Create {tool.label.toLowerCase()}</>}
                 </button>
               )}
@@ -745,7 +1158,16 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
 /*  Tutor  — clean focused chat, NO document preview panel             */
 /* ------------------------------------------------------------------ */
 
-function Tutor({ selected, refresh }) {
+function Tutor({
+  selected,
+  refresh,
+  refreshChats,
+  materials,
+  selectedSourceIds,
+  onToggleSource,
+  onSelectAllSources,
+  onDeleteSource
+}) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -772,12 +1194,18 @@ function Tutor({ selected, refresh }) {
 
   
   const clearChat = async () => {
-    if (!selected || messages.length === 0) return;
+    if (messages.length === 0) return;
     if (confirm("Are you sure you want to clear this conversation? This action cannot be undone.")) {
        setClearing(true);
        try {
-         await api.clearTutorHistory(selected.id);
+         if (selected?.id) {
+           await Promise.all([
+             api.clearTutorHistory(selected.id).catch(() => null),
+             api.deleteChatSession(selected.id).catch(() => null),
+           ]);
+         }
          setMessages([]);
+         if (refreshChats) refreshChats();
          if (refresh) refresh();
        } catch (err) {
          alert("Failed to clear chat: " + err.message);
@@ -789,15 +1217,20 @@ function Tutor({ selected, refresh }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !selected || busy) return;
+    if (!input.trim() || busy) return;
+    
+    // Ensure an active session ID exists
+    const currentSelected = selected || { id: "chat_" + Date.now(), name: "New Chat", is_chat: true };
     const q = input;
     setInput("");
     setMessages((x) => [...x, ["You", q, "you"]]);
     setBusy(true);
     try {
-      const r = await api.tutor(selected.id, q);
+      const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
+      const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId);
       setMessages((x) => [...x, ["Study tutor", r.response || r.answer || r.content || text(r), ""]]);
-      if (refresh) refresh();
+      // Lightweight sidebar-only refresh — shows this chat instantly in Recent Chats
+      if (refreshChats) refreshChats();
     } catch (err) {
       setMessages((x) => [...x, ["System", "Error: " + err.message, "error"]]);
     } finally {
@@ -807,14 +1240,22 @@ function Tutor({ selected, refresh }) {
 
   return (
     <section className="page tutor-page">
-      {/* Active-document indicator */}
-      <div className="source">
-        <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1}}>
-          <Brain size={18} />
-          <small>GROUNDING ANSWERS IN</small>
-          <b>{selected?.name || "Choose a source in your library"}</b>
+      {/* Active-document indicator & In-Chat Source Picker */}
+      <div className="source" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth: '240px'}}>
+          <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
+          <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
+          
+          <SourceSelectDropdown
+            materials={materials}
+            selectedSourceIds={selectedSourceIds}
+            onToggleSource={onToggleSource}
+            onSelectAll={onSelectAllSources}
+            onDeleteSource={onDeleteSource}
+          />
         </div>
-        {selected && messages.length > 0 && (
+
+        {messages.length > 0 && (
           <button className="btn-ghost" disabled={busy || clearing} onClick={clearChat} style={{marginLeft:'auto'}}>
             <Trash2 size={16} /> Clear Chat
           </button>
@@ -839,8 +1280,8 @@ function Tutor({ selected, refresh }) {
       </div>
 
       <form className="chat-input" onSubmit={submit}>
-        <input disabled={!selected || busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder={selected ? "Ask something about this material…" : "Select a material first"} />
-        <button className="btn-send" disabled={!selected || busy || !input.trim()} type="submit"><Send size={18} /></button>
+        <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your AI Tutor anything..." />
+        <button className="btn-send" disabled={busy || !input.trim()} type="submit"><Send size={18} /></button>
       </form>
     </section>
   );

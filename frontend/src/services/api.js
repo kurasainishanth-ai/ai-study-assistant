@@ -47,13 +47,16 @@ export const api = {
     request("/quiz/submit", json({ doc_id: id, questions, answers })),
   getQuizAttempts: (id) => request("/quiz/attempts/" + encodeURIComponent(id)),
 
-  // Tutor
-  tutor: (id, message) =>
-    request("/tutor/chat", json({ doc_id: id, message, level: "intermediate" })),
+  // Tutor & Chats
+  tutor: (id, message, level = "intermediate", sourceDocId = null) =>
+    request("/tutor/chat", json({ doc_id: id, message, level, source_doc_id: sourceDocId })),
   getTutorHistory: (id) => request("/tutor/history/" + encodeURIComponent(id)),
   clearTutorHistory: (id) =>
     request("/tutor/history/" + encodeURIComponent(id), { method: "DELETE" }),
   getRecentChats: () => request("/chats"),
+  getChatSession: (id) => request("/chats/" + encodeURIComponent(id)),
+  deleteChatSession: (id) =>
+    request("/chats/" + encodeURIComponent(id), { method: "DELETE" }),
 
   // Knowledge Map
   getMap: (id) => request("/knowledge-map/" + encodeURIComponent(id)),

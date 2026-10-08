@@ -80,6 +80,18 @@ def init_db():
             )
         """)
 
+        # 4b. Chat Sessions Metadata
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                source_doc_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (source_doc_id) REFERENCES materials (id) ON DELETE SET NULL
+            )
+        """)
+
         # 5. Quiz Attempts & Performance
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS quiz_attempts (
@@ -555,17 +567,131 @@ def get_learning_progress() -> Dict[str, Any]:
             "recommended_activity": recommendation
         }
 
-def get_recent_chats() -> List[Dict[str, Any]]:
+def ensure_chat_session(chat_id: str, title: Optional[str] = None, source_doc_id: Optional[str] = None):
+    """Creates or updates a chat session in SQLite."""
+    init_db()
+    now_str = datetime.now().strftime("%b %d, %H:%M")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, source_doc_id FROM chat_sessions WHERE id = ?", (chat_id,))
+        row = cursor.fetchone()
+        if row:
+            # Update timestamp, and update source_doc_id if provided
+            new_source = source_doc_id if source_doc_id is not None else row["source_doc_id"]
+            cursor.execute("UPDATE chat_sessions SET updated_at = ?, source_doc_id = ? WHERE id = ?", (now_str, new_source, chat_id))
+        else:
+            clean_title = (title or "New Chat").strip()
+            if len(clean_title) > 40:
+                clean_title = clean_title[:40] + "..."
+            cursor.execute("""
+                INSERT INTO chat_sessions (id, title, source_doc_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (chat_id, clean_title, source_doc_id, now_str, now_str))
+        conn.commit()
+
+def get_chat_session(chat_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves a single chat session metadata."""
     init_db()
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT doc_id, MIN(id) as first_id, content, timestamp 
-            FROM chat_messages 
-            WHERE doc_id LIKE 'chat_%' AND role = 'user'
-            GROUP BY doc_id
-            ORDER BY MAX(id) DESC
+            SELECT cs.*, m.name AS source_name
+            FROM chat_sessions cs
+            LEFT JOIN materials m ON m.id = cs.source_doc_id
+            WHERE cs.id = ?
+        """, (chat_id,))
+        r = cursor.fetchone()
+        if not r:
+            # Fallback for doc_ids that might be material IDs directly
+            mat = get_material(chat_id)
+            if mat:
+                return {
+                    "id": chat_id,
+                    "title": mat["name"],
+                    "source_doc_id": chat_id,
+                    "source_name": mat["name"],
+                    "created_at": mat["upload_time"],
+                    "updated_at": mat["upload_time"]
+                }
+            return None
+        return {
+            "id": r["id"],
+            "title": r["title"],
+            "source_doc_id": r["source_doc_id"],
+            "source_name": r["source_name"],
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"]
+        }
+
+def delete_chat_session(chat_id: str):
+    """Deletes a chat session and all its messages."""
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM chat_sessions WHERE id = ?", (chat_id,))
+        cursor.execute("DELETE FROM chat_messages WHERE doc_id = ?", (chat_id,))
+        conn.commit()
+
+def get_recent_chats() -> List[Dict[str, Any]]:
+    """Returns recent chat sessions with source document info, sorted by most recent activity."""
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        # 1. Fetch from chat_sessions
+        cursor.execute("""
+            SELECT 
+                cs.id,
+                cs.title,
+                cs.source_doc_id,
+                cs.updated_at,
+                m.name AS source_name
+            FROM chat_sessions cs
+            LEFT JOIN materials m ON m.id = cs.source_doc_id
+            ORDER BY cs.rowid DESC
         """)
         rows = cursor.fetchall()
-        return [{"id": r["doc_id"], "title": r["content"][:30] + ("..." if len(r["content"]) > 30 else ""), "timestamp": r["timestamp"]} for r in rows]
+        
+        results = []
+        seen_ids = set()
+        for r in rows:
+            seen_ids.add(r["id"])
+            title = r["title"] or "New Chat"
+            results.append({
+                "id": r["id"],
+                "title": title,
+                "timestamp": r["updated_at"],
+                "source_doc_id": r["source_doc_id"],
+                "source_name": r["source_name"],
+                "is_doc_chat": bool(r["source_doc_id"])
+            })
+
+        # 2. Legacy fallback: fetch chat_messages for doc_ids not yet in chat_sessions
+        cursor.execute("""
+            SELECT 
+                cm.doc_id,
+                cm.content AS first_user_msg,
+                cm.timestamp AS last_ts,
+                m.name AS source_name
+            FROM chat_messages cm
+            LEFT JOIN materials m ON m.id = cm.doc_id
+            WHERE cm.role = 'user'
+            GROUP BY cm.doc_id
+            ORDER BY MAX(cm.id) DESC
+        """)
+        legacy_rows = cursor.fetchall()
+        for r in legacy_rows:
+            doc_id = r["doc_id"]
+            if doc_id not in seen_ids:
+                seen_ids.add(doc_id)
+                msg = r["first_user_msg"] or "Chat"
+                title = msg[:35] + ("..." if len(msg) > 35 else "")
+                results.append({
+                    "id": doc_id,
+                    "title": title,
+                    "timestamp": r["last_ts"],
+                    "source_doc_id": doc_id if not doc_id.startswith("chat_") else None,
+                    "source_name": r["source_name"],
+                    "is_doc_chat": not doc_id.startswith("chat_")
+                })
+        return results
 

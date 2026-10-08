@@ -10,9 +10,25 @@ LEVEL_INSTRUCTIONS = {
     "university": "Provide rigorous, university-level explanations. Analyze theoretical nuances, underlying mechanisms, edge cases, and formal academic concepts."
 }
 
-def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate") -> Dict[str, Any]:
+def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate", source_doc_id: Optional[str] = None) -> Dict[str, Any]:
     """Generates a conversational response grounded in the uploaded material with citations."""
-    if doc_id.startswith("chat_"):
+    # 1. Check existing session for source_doc_id if not explicitly provided
+    existing_session = db.get_chat_session(doc_id)
+    if existing_session and existing_session.get("source_doc_id"):
+        source_doc_id = existing_session["source_doc_id"]
+    elif not source_doc_id and not doc_id.startswith("chat_"):
+        source_doc_id = doc_id
+
+    # 2. Get document content for grounding
+    material_name = "All Workspace Materials"
+    doc_content = ""
+    if source_doc_id:
+        material = db.get_material(source_doc_id)
+        if material:
+            doc_content = material.get("content", "") or ""
+            material_name = material['name']
+
+    if not doc_content.strip():
         all_mats = db.get_all_materials()
         doc_content = ""
         material_name = "All Workspace Materials"
@@ -20,21 +36,11 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate") -> Dic
             doc_content += f"--- MATERIAL: {m['name']} ---\n{m.get('content', '')}\n\n"
         if not doc_content.strip():
             doc_content = "No study materials uploaded to the workspace yet."
-    else:
-        material = db.get_material(doc_id)
-        if not material:
-            raise ValueError(f"Study material with ID '{doc_id}' not found.")
-            
-        doc_content = material.get("content", "")
-        material_name = material['name']
-        if not doc_content.strip():
-            return {
-                "answer": "The selected document does not contain readable text to reference.",
-                "citations": [],
-                "level": level
-            }
 
-    # Fetch recent chat history
+    # 3. Ensure the chat session exists and is persisted in SQLite
+    db.ensure_chat_session(doc_id, title=question[:40], source_doc_id=source_doc_id)
+
+    # 4. Fetch recent chat history
     history = db.get_chat_history(doc_id)
     history_context = []
     for msg in history[-6:]:
@@ -74,12 +80,15 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate") -> Dic
     # Extract citations like [Page 1], [Slide 2], etc.
     citations = list(set(re.findall(r"\[(?:Page|Slide|Section)\s*[^\]]+\]", answer_text, re.IGNORECASE)))
 
-    # Persist in SQLite
+    # Persist messages in SQLite
     db.save_chat_message(doc_id=doc_id, role="user", content=question, level=level)
     db.save_chat_message(doc_id=doc_id, role="assistant", content=answer_text, level=level, citations=citations)
 
     return {
+        "chat_id": doc_id,
         "answer": answer_text,
         "citations": citations,
-        "level": level
+        "level": level,
+        "source_doc_id": source_doc_id,
+        "source_name": material_name
     }
