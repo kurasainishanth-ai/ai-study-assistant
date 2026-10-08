@@ -514,3 +514,13 @@ def generate_visual_art_endpoint(req: VisualArtRequest):
 def get_progress_endpoint():
     """Returns genuine, non-fabricated learning analytics."""
     return db.get_learning_progress()
+
+@app.get("/api/chats")
+def list_recent_chats():
+    """Returns recent global chat sessions."""
+    try:
+        return db.get_recent_chats()
+    except Exception as e:
+        logger.error(f"Error fetching chats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+

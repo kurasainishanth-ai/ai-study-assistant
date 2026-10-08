@@ -554,3 +554,18 @@ def get_learning_progress() -> Dict[str, Any]:
             "revision_topics": revision_topics,
             "recommended_activity": recommendation
         }
+
+def get_recent_chats() -> List[Dict[str, Any]]:
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT doc_id, MIN(id) as first_id, content, timestamp 
+            FROM chat_messages 
+            WHERE doc_id LIKE 'chat_%' AND role = 'user'
+            GROUP BY doc_id
+            ORDER BY MAX(id) DESC
+        """)
+        rows = cursor.fetchall()
+        return [{"id": r["doc_id"], "title": r["content"][:30] + ("..." if len(r["content"]) > 30 else ""), "timestamp": r["timestamp"]} for r in rows]
+

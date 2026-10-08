@@ -12,17 +12,27 @@ LEVEL_INSTRUCTIONS = {
 
 def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate") -> Dict[str, Any]:
     """Generates a conversational response grounded in the uploaded material with citations."""
-    material = db.get_material(doc_id)
-    if not material:
-        raise ValueError(f"Study material with ID '{doc_id}' not found.")
-        
-    doc_content = material.get("content", "")
-    if not doc_content.strip():
-        return {
-            "answer": "The selected document does not contain readable text to reference.",
-            "citations": [],
-            "level": level
-        }
+    if doc_id.startswith("chat_"):
+        all_mats = db.get_all_materials()
+        doc_content = ""
+        material_name = "All Workspace Materials"
+        for m in all_mats:
+            doc_content += f"--- MATERIAL: {m['name']} ---\n{m.get('content', '')}\n\n"
+        if not doc_content.strip():
+            doc_content = "No study materials uploaded to the workspace yet."
+    else:
+        material = db.get_material(doc_id)
+        if not material:
+            raise ValueError(f"Study material with ID '{doc_id}' not found.")
+            
+        doc_content = material.get("content", "")
+        material_name = material['name']
+        if not doc_content.strip():
+            return {
+                "answer": "The selected document does not contain readable text to reference.",
+                "citations": [],
+                "level": level
+            }
 
     # Fetch recent chat history
     history = db.get_chat_history(doc_id)
@@ -45,7 +55,7 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate") -> Dic
     )
 
     prompt = (
-        f"STUDY MATERIAL (Source: '{material['name']}'):\n"
+        f"STUDY MATERIAL (Source: '{material_name}'):\n"
         f"{doc_content}\n\n"
         f"CONVERSATION HISTORY:\n"
         f"{history_str}\n\n"

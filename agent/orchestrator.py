@@ -9,16 +9,24 @@ from services.gemini_caller import call_gemini_with_retry_full
 
 logger = logging.getLogger(__name__)
 
-
 def generate_dynamic_response(doc_id: str, user_request: str) -> Dict[str, Any]:
     """Generate a dynamic AI response for the given user request."""
     # 1. Retrieve document context
-    material = None
     extracted_content = ""
+    doc_name = "document"
     if doc_id:
-        material = db.get_material(doc_id)
-        if material:
-            extracted_content = material.get("content", "")
+        if doc_id.startswith("chat_"):
+            # Global chat: reason over ALL materials
+            all_mats = db.get_all_materials()
+            if all_mats:
+                doc_name = "All Workspace Materials"
+                for m in all_mats:
+                    extracted_content += f"--- MATERIAL: {m['name']} ---\n{m.get('content', '')}\n\n"
+        else:
+            material = db.get_material(doc_id)
+            if material:
+                extracted_content = material.get("content", "")
+                doc_name = material.get("name", "document")
 
     # 2. Retrieve conversation history
     history_records = []
@@ -30,9 +38,8 @@ def generate_dynamic_response(doc_id: str, user_request: str) -> Dict[str, Any]:
     contents = []
 
     if extracted_content:
-        doc_name = material.get("name", "document") if material else "document"
         doc_msg = (
-            f"Active study material: \"{doc_name}\"\n\n"
+            f"Active study material(s): \"{doc_name}\"\n\n"
             f"{extracted_content}\n\n"
             "[System: Material loaded. Respond to the student's next message.]"
         )
@@ -58,18 +65,14 @@ def generate_dynamic_response(doc_id: str, user_request: str) -> Dict[str, Any]:
         )
         response_text = response.text or ""
         
-        # Check for truncation
         is_truncated = False
         try:
             if response.candidates and response.candidates[0].finish_reason:
                 finish_reason = str(response.candidates[0].finish_reason)
                 if "MAX_TOKENS" in finish_reason or "LENGTH" in finish_reason:
                     is_truncated = True
-                    logger.info(f"Response was truncated (finish_reason={finish_reason})")
         except (AttributeError, IndexError):
             pass
-        
-        logger.debug(f"Raw response length: {len(response_text)} chars")
         
     except Exception as e:
         logger.error(f"Gemini API call failed: {type(e).__name__}: {e}")
@@ -103,3 +106,4 @@ def generate_dynamic_response(doc_id: str, user_request: str) -> Dict[str, Any]:
             logger.warning(f"Failed to save chat history: {e}")
 
     return result
+

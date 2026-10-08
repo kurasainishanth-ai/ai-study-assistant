@@ -375,6 +375,7 @@ const TOOLS = [
 export default function App() {
   const [view, setView] = useState("home");
   const [materials, setMaterials] = useState([]);
+  const [chats, setChats] = useState([]);
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -387,11 +388,28 @@ export default function App() {
     try {
       const data = await api.materials();
       setMaterials(data);
-      setSelected((cur) => data.find((x) => x.id === cur?.id) || data[0] || null);
+      if (!selected) setSelected(data[0] || null);
+      
+      try {
+        const chatsData = await api.getRecentChats();
+        setChats(chatsData || []);
+      } catch(e) {}
     } catch (e) { setNotice(e.message); }
-  }, []);
+  }, [selected]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  
+  const createNewChat = () => {
+    const newId = "chat_" + Date.now();
+    setSelected({ id: newId, name: "New Chat", is_chat: true });
+    setView("tutor");
+  };
+
+  const selectChat = (chat) => {
+    setSelected({ id: chat.id, name: chat.title, is_chat: true });
+    setView("tutor");
+  };
 
   const upload = async (file) => {
     if (!file) return;
@@ -418,6 +436,20 @@ export default function App() {
             <Icon size={17} />{label}
           </button>
         ))}
+        
+        <div style={{marginTop: '20px', marginBottom: '10px'}}>
+          <small className="label">RECENT CHATS</small>
+          <button className="nav" onClick={createNewChat} style={{marginTop: '4px'}}>
+            <Plus size={17} /> New Chat
+          </button>
+          <div style={{maxHeight: '150px', overflowY: 'auto', marginTop: '4px'}}>
+            {chats.map(chat => (
+              <button key={chat.id} className={`nav${selected?.id === chat.id && view === "tutor" ? " on" : ""}`} onClick={() => selectChat(chat)}>
+                <MessageCircle size={15} /> <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{chat.title || "Chat"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="side-bottom">
           <div className="tip"><Sparkles size={16} /><span><b>Study smarter</b>Turn one file into a plan.</span></div>
           <button className="btn-primary add" onClick={() => setShowUpload(true)}><Plus size={17} />Add material</button>
@@ -436,7 +468,7 @@ export default function App() {
         {view === "home" && <Home materials={materials} selected={selected} choose={setSelected} go={setView} upload={() => setShowUpload(true)} />}
         {view === "library" && <Library materials={materials} selected={selected} choose={setSelected} refresh={refresh} warn={setNotice} upload={() => setShowUpload(true)} />}
         {view === "studio" && <Studio selected={selected} choose={setSelected} cache={cache} setCache={setCache} warn={setNotice} go={setView} />}
-        {view === "tutor" && <Tutor selected={selected} />}
+        {view === "tutor" && <Tutor selected={selected} refresh={refresh} />}
       </main>
 
       {showUpload && <UploadModal busy={busy} close={() => setShowUpload(false)} choose={() => fileRef.current.click()} sample={async () => { setBusy(true); try { await api.sample(); await refresh(); setShowUpload(false); setView("library"); } catch (e) { setNotice(e.message); } finally { setBusy(false); } }} />}
@@ -713,7 +745,7 @@ function Studio({ selected, choose, cache, setCache, warn, go }) {
 /*  Tutor  — clean focused chat, NO document preview panel             */
 /* ------------------------------------------------------------------ */
 
-function Tutor({ selected }) {
+function Tutor({ selected, refresh }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -746,6 +778,7 @@ function Tutor({ selected }) {
        try {
          await api.clearTutorHistory(selected.id);
          setMessages([]);
+         if (refresh) refresh();
        } catch (err) {
          alert("Failed to clear chat: " + err.message);
        } finally {
@@ -764,6 +797,7 @@ function Tutor({ selected }) {
     try {
       const r = await api.tutor(selected.id, q);
       setMessages((x) => [...x, ["Study tutor", r.response || r.answer || r.content || text(r), ""]]);
+      if (refresh) refresh();
     } catch (err) {
       setMessages((x) => [...x, ["System", "Error: " + err.message, "error"]]);
     } finally {
@@ -834,3 +868,4 @@ function UploadModal({ busy, close, choose, sample }) {
     </div>
   );
 }
+

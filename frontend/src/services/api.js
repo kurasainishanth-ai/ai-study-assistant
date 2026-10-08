@@ -53,6 +53,7 @@ export const api = {
   getTutorHistory: (id) => request("/tutor/history/" + encodeURIComponent(id)),
   clearTutorHistory: (id) =>
     request("/tutor/history/" + encodeURIComponent(id), { method: "DELETE" }),
+  getRecentChats: () => request("/chats"),
 
   // Knowledge Map
   getMap: (id) => request("/knowledge-map/" + encodeURIComponent(id)),
