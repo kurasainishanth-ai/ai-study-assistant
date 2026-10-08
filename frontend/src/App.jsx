@@ -4,7 +4,9 @@ import {
   LayoutDashboard, LoaderCircle, MessageCircle, Plus, RefreshCw, Send,
   Sparkles, Trash2, Upload, WandSparkles, X, RotateCcw,
   CheckCircle2, XCircle, Map as MapIcon, Layers, FileText,
-  AlertTriangle, Check, ArrowLeft
+  AlertTriangle, Check, ArrowLeft,
+  LayoutTemplate, Download, Mic, Volume2, VolumeX, Square,
+  Star, Zap, GitBranch, Columns, Clock, ListOrdered, Info, Calendar
 } from "lucide-react";
 import { api } from "./services/api";
 import ReactMarkdown from "react-markdown";
@@ -357,6 +359,890 @@ function MapRenderer({ data }) {
   );
 }
 
+function buildDownloadableInfographicHTML(inf) {
+  const sectionsHtml = (inf.sections || []).map(sec => `
+    <div class="card">
+      <h3>${sec.heading}</h3>
+      ${(sec.items || []).map(it => `
+        <div class="item">
+          <div class="item-head">
+            <b>${it.label}</b>
+            ${it.source_ref ? `<span class="pill">${it.source_ref}</span>` : ''}
+          </div>
+          <p>${it.content}</p>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+
+  const stepsHtml = (inf.flow_steps && inf.flow_steps.length > 0) ? `
+    <div class="card full-width">
+      <h3>Workflow & Stages</h3>
+      <div class="steps-grid">
+        ${inf.flow_steps.map((st, i) => `
+          <div class="step-card">
+            <div class="step-num">${st.step_number || i + 1}</div>
+            <h4>${st.title}</h4>
+            <p>${st.description}</p>
+            ${st.source_ref ? `<small class="pill">${st.source_ref}</small>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const compHtml = (inf.comparison_matrix && inf.comparison_matrix.headers && inf.comparison_matrix.rows) ? `
+    <div class="card full-width">
+      <h3>Comparison Matrix</h3>
+      <table style="width:100%; border-collapse:collapse; margin-top:8px;">
+        <thead>
+          <tr style="border-bottom:2px solid #dddcd4; background:#f0efe9;">
+            ${inf.comparison_matrix.headers.map(h => `<th style="padding:8px 12px; text-align:left;">${h}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${inf.comparison_matrix.rows.map(r => `
+            <tr style="border-bottom:1px solid #dddcd4;">
+              ${r.map(c => `<td style="padding:8px 12px;">${c}</td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : '';
+
+  const takeawaysHtml = (inf.key_takeaways && inf.key_takeaways.length > 0) ? `
+    <div class="card highlight">
+      <h3>★ Key Takeaways</h3>
+      <ul>${inf.key_takeaways.map(t => `<li>${t}</li>`).join('')}</ul>
+    </div>
+  ` : '';
+
+  const examHtml = (inf.exam_tips && inf.exam_tips.length > 0) ? `
+    <div class="card warning">
+      <h3>⚡ High-Yield Exam Points</h3>
+      <ul>${inf.exam_tips.map(t => `<li>${t}</li>`).join('')}</ul>
+    </div>
+  ` : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${inf.title || 'StudyVerse Infographic'}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f3ed; color: #25332d; margin: 0; padding: 24px; }
+  .container { max-width: 1000px; margin: 0 auto; }
+  .header { background: #fbfaf6; border: 1px solid #dddcd4; border-radius: 12px; padding: 24px 28px; margin-bottom: 20px; }
+  .type-pill { display: inline-block; background: rgba(16,185,129,0.15); color: #10b981; font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; margin-bottom: 8px; }
+  h1 { font-size: 26px; margin: 4px 0 8px; color: #17372f; }
+  .subtitle { font-size: 14px; color: #526057; margin-bottom: 12px; }
+  .summary { background: #f0efe9; border-left: 4px solid #e4b968; padding: 10px 14px; font-size: 13px; line-height: 1.6; border-radius: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .card { background: #fbfaf6; border: 1px solid #dddcd4; border-radius: 12px; padding: 20px; }
+  .card h3 { margin-top: 0; font-size: 16px; color: #17372f; border-bottom: 1px solid #dddcd4; padding-bottom: 8px; }
+  .item { background: #f0efe9; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .item-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .item p { margin: 0; font-size: 12.5px; color: #526057; line-height: 1.5; }
+  .pill { font-size: 10px; background: rgba(0,0,0,0.06); padding: 2px 6px; border-radius: 4px; color: #78350f; }
+  .full-width { grid-column: 1 / -1; }
+  .steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+  .step-card { background: #f0efe9; padding: 14px; border-radius: 8px; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: #17372f; color: #fff; text-align: center; line-height: 22px; font-weight: bold; font-size: 12px; margin-bottom: 6px; }
+  .step-card h4 { margin: 0 0 6px; font-size: 14px; }
+  .step-card p { margin: 0; font-size: 12px; color: #526057; }
+  .highlight { background: #e6efe6; border-color: #10b981; }
+  .warning { background: #fef3c7; border-color: #f59e0b; color: #78350f; }
+  ul { margin: 0; padding-left: 20px; line-height: 1.6; font-size: 13px; }
+  @media print { body { background: #fff; padding: 0; } .card, .header { border-color: #ccc; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <span class="type-pill">${inf.type_title || 'Infographic'}</span>
+    <h1>${inf.title}</h1>
+    <div class="subtitle">${inf.subtitle || ''} · Source: ${inf.doc_name || 'Study Material'}</div>
+    ${inf.summary ? `<div class="summary">${inf.summary}</div>` : ''}
+  </div>
+  ${stepsHtml}
+  ${compHtml}
+  <div class="grid">${sectionsHtml}</div>
+  <div class="grid">${takeawaysHtml}${examHtml}</div>
+  <small style="color:#78847c;">Generated by StudyVerse AI Platform</small>
+</div>
+</body>
+</html>`;
+}
+
+function InfographicRenderer({ data, busy, onGenerateType, currentType }) {
+  if (!data) return null;
+  const inf = data.data || data;
+  if (!inf || !inf.sections) return null;
+
+  const INF_TYPE_LIST = [
+    { key: "concept_overview", label: "Concept Overview", icon: Brain },
+    { key: "topic_summary",    label: "Topic Summary",    icon: FileText },
+    { key: "process_flow",     label: "Process / Flow",   icon: GitBranch },
+    { key: "comparison",       label: "Comparison",       icon: Columns },
+    { key: "exam_revision",    label: "Exam Revision",    icon: Zap },
+    { key: "timeline",         label: "Timeline",         icon: Clock },
+    { key: "step_by_step",     label: "Step-by-Step",     icon: ListOrdered },
+  ];
+
+  const handleDownload = () => {
+    const html = buildDownloadableInfographicHTML(inf);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(inf.title || "studyverse_infographic").replace(/[^a-z0-9]/gi, "_").toLowerCase()}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const activeKey = currentType || inf.type || "concept_overview";
+
+  return (
+    <div className="render-infographic" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+      {/* Type Selector Pills & Download */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', background: 'var(--surface-2)', padding: '12px 16px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <small style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '11px', color: 'var(--fg-3)', marginRight: '4px' }}>INFOGRAPHIC TYPE:</small>
+          {INF_TYPE_LIST.map((t) => {
+            const TIcon = t.icon;
+            const isCur = activeKey === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                disabled={busy}
+                onClick={() => onGenerateType(t.key)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: isCur ? '1px solid var(--primary, #10b981)' : '1px solid var(--border)',
+                  background: isCur ? 'var(--primary, #10b981)' : 'var(--surface)',
+                  color: isCur ? '#fff' : 'var(--fg-2)',
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <TIcon size={13} /> {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="btn-secondary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', fontSize: '12.5px' }}
+          title="Download printable standalone HTML infographic"
+        >
+          <Download size={14} /> Download HTML
+        </button>
+      </div>
+
+      {/* Main Infographic Banner */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px 28px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', background: 'rgba(16,185,129,0.12)', color: 'var(--primary, #10b981)', padding: '3px 10px', borderRadius: '12px' }}>
+            {inf.type_title || "INFOGRAPHIC"}
+          </span>
+          {inf.doc_name && (
+            <span style={{ fontSize: '12px', color: 'var(--fg-3)' }}>
+              Source: <b>{inf.doc_name}</b>
+            </span>
+          )}
+        </div>
+        <h2 style={{ fontSize: '24px', fontWeight: 800, margin: '4px 0 8px', letterSpacing: '-0.5px', color: 'var(--fg)' }}>
+          {inf.title}
+        </h2>
+        {inf.subtitle && (
+          <p style={{ fontSize: '14px', color: 'var(--fg-2)', margin: '0 0 12px', lineHeight: 1.5 }}>
+            {inf.subtitle}
+          </p>
+        )}
+        {inf.summary && (
+          <div style={{ background: 'var(--surface-2)', borderLeft: '3px solid var(--accent, #e4b968)', padding: '10px 14px', borderRadius: '4px', fontSize: '13px', color: 'var(--fg-2)', lineHeight: 1.6 }}>
+            {inf.summary}
+          </div>
+        )}
+      </div>
+
+      {/* Sequential Workflow / Steps (when present) */}
+      {inf.flow_steps && inf.flow_steps.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <GitBranch size={18} style={{ color: 'var(--primary, #10b981)' }} />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Workflow & Sequential Stages</h3>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+            {inf.flow_steps.map((st, si) => (
+              <div key={si} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--green)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700 }}>
+                    {st.step_number || si + 1}
+                  </span>
+                  {st.source_ref && (
+                    <span style={{ fontSize: '10px', background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px', color: 'var(--fg-3)' }}>
+                      📍 {st.source_ref}
+                    </span>
+                  )}
+                </div>
+                <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'var(--fg)' }}>{st.title}</h4>
+                <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--fg-2)', lineHeight: 1.55 }}>{st.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Comparison Matrix (when present) */}
+      {inf.comparison_matrix && inf.comparison_matrix.headers && inf.comparison_matrix.rows && inf.comparison_matrix.rows.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', overflowX: 'auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <Columns size={18} style={{ color: 'var(--purple, #a78bfa)' }} />
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Side-by-Side Comparison</h3>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border)' }}>
+                {inf.comparison_matrix.headers.map((h, hi) => (
+                  <th key={hi} style={{ padding: '10px 14px', fontWeight: 700, color: 'var(--fg)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {inf.comparison_matrix.rows.map((row, ri) => (
+                <tr key={ri} style={{ borderBottom: '1px solid var(--border)', background: ri % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)' }}>
+                  {row.map((cell, ci) => (
+                    <td key={ci} style={{ padding: '10px 14px', color: ci === 0 ? 'var(--fg)' : 'var(--fg-2)', fontWeight: ci === 0 ? 600 : 400 }}>
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Section Cards Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
+        {(inf.sections || []).map((sec, si) => (
+          <div
+            key={si}
+            style={{
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary, #10b981)' }} />
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--fg)' }}>{sec.heading}</h3>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {(sec.items || []).map((it, ii) => (
+                <div key={ii} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
+                    <b style={{ fontSize: '13px', color: 'var(--fg)' }}>{it.label}</b>
+                    {it.source_ref && (
+                      <span style={{ fontSize: '10px', background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px', color: 'var(--fg-3)', flexShrink: 0 }}>
+                        📍 {it.source_ref}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--fg-2)', lineHeight: 1.55 }}>
+                    {it.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Key Takeaways & Exam Tips */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+        {inf.key_takeaways && inf.key_takeaways.length > 0 && (
+          <div style={{ background: 'var(--surface-3, #e6efe6)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--green)' }}>
+              <Star size={18} fill="currentColor" />
+              <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Key Takeaways</h4>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: 'var(--fg)' }}>
+              {inf.key_takeaways.map((tk, ti) => (
+                <li key={ti} style={{ lineHeight: 1.5 }}>{tk}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {inf.exam_tips && inf.exam_tips.length > 0 && (
+          <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: '#b45309' }}>
+              <Zap size={18} fill="currentColor" />
+              <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Exam Points & Pitfalls</h4>
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: '#78350f' }}>
+              {inf.exam_tips.map((tip, ti) => (
+                <li key={ti} style={{ lineHeight: 1.5 }}>{tip}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Citations footer */}
+      {inf.source_refs && inf.source_refs.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'var(--fg-3)', padding: '0 4px' }}>
+          <Info size={14} />
+          <span>Verified Sources: {inf.source_refs.join(", ")}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Smart Revision Scheduler Component (feature/yagnesh)               */
+/* ------------------------------------------------------------------ */
+
+function RevisionScheduler({ docId, plan, busy, onSavePlan }) {
+  const initialPlan = plan?.plan_data || (plan?.days ? plan : null);
+  const [currentPlan, setCurrentPlan] = useState(initialPlan);
+  const [topicsData, setTopicsData] = useState(null);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+  const [isConfiguring, setIsConfiguring] = useState(!initialPlan);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const defaultExamStr = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+
+  const [examDate, setExamDate] = useState(initialPlan?.exam_date || defaultExamStr);
+  const [startDate, setStartDate] = useState(initialPlan?.start_date || todayStr);
+  const [dailyHours, setDailyHours] = useState(initialPlan?.daily_hours || 2.0);
+  const [topicPriorities, setTopicPriorities] = useState({});
+
+  useEffect(() => {
+    const p = plan?.plan_data || (plan?.days ? plan : null);
+    if (p) {
+      setCurrentPlan(p);
+      setIsConfiguring(false);
+    }
+  }, [plan]);
+
+  useEffect(() => {
+    if (!docId) return;
+    let live = true;
+    setLoadingTopics(true);
+    api.getRevisionTopics(docId)
+      .then((res) => {
+        if (!live) return;
+        setTopicsData(res);
+        const priorities = {};
+        (res.topics || []).forEach((t) => {
+          priorities[t.id] = t.priority || "medium";
+        });
+        setTopicPriorities(priorities);
+      })
+      .catch((e) => {
+        if (live) setError("Could not load topics: " + e.message);
+      })
+      .finally(() => {
+        if (live) setLoadingTopics(false);
+      });
+    return () => { live = false; };
+  }, [docId]);
+
+  const handleGenerate = async () => {
+    if (!docId) return;
+    setError("");
+    setGenerating(true);
+    try {
+      const generated = await api.generateRevisionPlan({
+        doc_id: docId,
+        exam_date: examDate,
+        daily_hours: Number(dailyHours),
+        start_date: startDate,
+        topic_overrides: topicPriorities,
+      });
+      setCurrentPlan(generated);
+      setIsConfiguring(false);
+      if (onSavePlan) onSavePlan(generated);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleToggleTask = async (taskId, currentCompleted) => {
+    if (!docId) return;
+    const newCompleted = !currentCompleted;
+    setCurrentPlan((prev) => {
+      if (!prev) return prev;
+      let total = 0;
+      let comp = 0;
+      const updatedDays = (prev.days || []).map((day) => ({
+        ...day,
+        tasks: (day.tasks || []).map((task) => {
+          total += 1;
+          const isTarget = task.id === taskId;
+          const state = isTarget ? newCompleted : task.completed;
+          if (state) comp += 1;
+          return isTarget ? { ...task, completed: newCompleted } : task;
+        }),
+      }));
+      const updated = {
+        ...prev,
+        days: updatedDays,
+        completed_tasks: comp,
+        completion_percentage: Math.round((comp / Math.max(total, 1)) * 100),
+      };
+      if (onSavePlan) onSavePlan(updated);
+      return updated;
+    });
+
+    try {
+      await api.updateRevisionTaskStatus(docId, taskId, newCompleted);
+    } catch (e) {
+      console.error("Task update error:", e);
+    }
+  };
+
+  const setPriorityForTopic = (topicId, level) => {
+    setTopicPriorities((prev) => ({ ...prev, [topicId]: level }));
+  };
+
+  if (!docId) {
+    return (
+      <div className="card-box" style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <Calendar size={36} style={{ color: 'var(--green)', margin: '0 auto 12px', opacity: 0.8 }} />
+        <h3>Choose a study material</h3>
+        <p style={{ color: 'var(--fg-3)', fontSize: '13px' }}>Select an uploaded course material to generate an adaptive revision plan.</p>
+      </div>
+    );
+  }
+
+  // --- Configuration View ---
+  if (isConfiguring || !currentPlan) {
+    return (
+      <div className="scheduler-setup" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {error && <div className="error-box"><XCircle size={15} /> {error}</div>}
+
+        <div className="card-box" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Calendar size={20} style={{ color: 'var(--primary, #10b981)' }} />
+                <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--fg-1)' }}>Configure Your Revision Plan</h3>
+              </div>
+              <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--fg-3)' }}>
+                Target your exam date and daily study time. Weak concepts from your practice quizzes receive priority reinforcement.
+              </p>
+            </div>
+            {currentPlan && (
+              <button className="btn-ghost" onClick={() => setIsConfiguring(false)} style={{ fontSize: '12px', padding: '6px 12px' }}>
+                Cancel & View Active Plan
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '22px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--fg-2)', marginBottom: '6px' }}>
+                📅 Target Exam Date
+              </label>
+              <input
+                type="date"
+                min={todayStr}
+                value={examDate}
+                onChange={(e) => setExamDate(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--fg-1)', fontSize: '13px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--fg-2)', marginBottom: '6px' }}>
+                🚀 Revision Start Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--fg-1)', fontSize: '13px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--fg-2)', marginBottom: '6px' }}>
+                ⏳ Daily Available Study Time: <b>{dailyHours} hrs</b>
+              </label>
+              <input
+                type="range"
+                min="0.5"
+                max="8.0"
+                step="0.5"
+                value={dailyHours}
+                onChange={(e) => setDailyHours(parseFloat(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--green, #17372f)', marginTop: '8px' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--fg-3)', marginTop: '2px' }}>
+                <span>30 min/day</span>
+                <span>4 hrs/day</span>
+                <span>8 hrs/day</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Topic Prioritization Table */}
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--fg-1)' }}>
+                Topic Mastery & Prioritization
+              </h4>
+              <small style={{ fontSize: '11.5px', color: 'var(--fg-3)' }}>
+                {topicsData?.has_quiz_data ? "✅ Connected with real quiz performance" : "ℹ️ Self-Assessment (no quiz attempts yet)"}
+              </small>
+            </div>
+
+            {loadingTopics ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '16px 0', color: 'var(--fg-3)', fontSize: '13px' }}>
+                <LoaderCircle className="spin" size={16} /> Identifying document topics…
+              </div>
+            ) : topicsData?.topics && topicsData.topics.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {topicsData.topics.map((t) => {
+                  const currentLevel = topicPriorities[t.id] || t.priority || "medium";
+                  return (
+                    <div
+                      key={t.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        borderRadius: '8px',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        flexWrap: 'wrap',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: '200px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--fg-1)' }}>{t.name}</span>
+                        {t.performance_data_available && t.quiz_score !== null ? (
+                          <div style={{ fontSize: '11.5px', color: t.quiz_score < 70 ? '#ef4444' : t.quiz_score < 85 ? '#f59e0b' : '#10b981', marginTop: '2px' }}>
+                            🎯 Quiz Accuracy: <b>{t.quiz_score}%</b> ({t.quiz_score < 70 ? 'Weak Concept' : t.quiz_score < 85 ? 'Review Recommended' : 'Mastered'})
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '11px', color: 'var(--fg-3)', marginTop: '2px' }}>
+                            No quiz score recorded yet
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setPriorityForTopic(t.id, 'weak')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            border: currentLevel === 'weak' ? '1px solid #ef4444' : '1px solid var(--border)',
+                            background: currentLevel === 'weak' ? '#fee2e2' : 'transparent',
+                            color: currentLevel === 'weak' ? '#991b1b' : 'var(--fg-3)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🔴 Weak
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPriorityForTopic(t.id, 'medium')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            border: currentLevel === 'medium' ? '1px solid #f59e0b' : '1px solid var(--border)',
+                            background: currentLevel === 'medium' ? '#fef3c7' : 'transparent',
+                            color: currentLevel === 'medium' ? '#92400e' : 'var(--fg-3)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🟡 Medium
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPriorityForTopic(t.id, 'strong')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '11.5px',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            border: currentLevel === 'strong' ? '1px solid #10b981' : '1px solid var(--border)',
+                            background: currentLevel === 'strong' ? '#d1fae5' : 'transparent',
+                            color: currentLevel === 'strong' ? '#065f46' : 'var(--fg-3)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          🟢 Strong
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: '12.5px', color: 'var(--fg-3)', padding: '8px 0' }}>
+                Topics will be synthesized directly from the course text upon generation.
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+            <button
+              className="btn-primary"
+              disabled={generating}
+              onClick={handleGenerate}
+              style={{ padding: '10px 22px', fontSize: '13.5px' }}
+            >
+              {generating ? (
+                <>
+                  <LoaderCircle className="spin" size={16} /> Generating Revision Plan…
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} /> Build Adaptive Revision Schedule
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Active Revision Plan View ---
+  const completionPct = currentPlan.completion_percentage || 0;
+  const completedTasks = currentPlan.completed_tasks || 0;
+  const totalTasks = currentPlan.total_tasks || 0;
+
+  return (
+    <div className="revision-schedule-view" style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+      {/* Overview & Progress Header */}
+      <div
+        className="card-box"
+        style={{
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '20px 24px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px', marginBottom: '14px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: 'var(--green)', color: '#fff', textTransform: 'uppercase' }}>
+                Active Revision Plan
+              </span>
+              <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--fg-1)' }}>{currentPlan.doc_name}</h2>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '12.5px', color: 'var(--fg-3)', marginTop: '6px', flexWrap: 'wrap' }}>
+              <span>📅 Exam: <b>{currentPlan.exam_date}</b> ({currentPlan.available_days} days)</span>
+              <span>⏳ Daily Target: <b>{currentPlan.daily_hours} hrs/day</b></span>
+              <span>⏱️ Total Study: <b>{currentPlan.total_planned_hours} hrs</b></span>
+            </div>
+          </div>
+
+          <button
+            className="btn-ghost"
+            onClick={() => setIsConfiguring(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '7px 12px' }}
+          >
+            <RotateCcw size={14} /> Adjust Settings / Regenerate
+          </button>
+        </div>
+
+        {/* Progress Bar */}
+        <div style={{ background: 'var(--bg)', borderRadius: '10px', padding: '12px 16px', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '12.5px' }}>
+            <span style={{ fontWeight: 600, color: 'var(--fg-2)' }}>Overall Revision Progress</span>
+            <span style={{ fontWeight: 700, color: 'var(--green)' }}>
+              {completionPct}% Complete ({completedTasks}/{totalTasks} tasks finished)
+            </span>
+          </div>
+          <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${completionPct}%`,
+                height: '100%',
+                background: completionPct === 100 ? '#10b981' : 'var(--green, #17372f)',
+                transition: 'width 0.3s ease'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Warning if schedule is tight */}
+        {currentPlan.is_tight && currentPlan.tight_warning && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fef3c7', color: '#92400e', padding: '10px 14px', borderRadius: '8px', fontSize: '12.5px', marginTop: '14px' }}>
+            <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+            <span>{currentPlan.tight_warning}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Day-by-Day Timeline */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {(currentPlan.days || []).map((day) => {
+          const dayCompleted = day.tasks && day.tasks.length > 0 && day.tasks.every((t) => t.completed);
+          return (
+            <div
+              key={day.day_number}
+              className="day-card"
+              style={{
+                background: 'var(--surface-2)',
+                border: dayCompleted ? '1px solid #10b981' : '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '18px 22px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      background: dayCompleted ? '#10b981' : 'var(--green)',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      fontWeight: 700
+                    }}
+                  >
+                    {dayCompleted ? <Check size={14} /> : day.day_number}
+                  </span>
+                  <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--fg-1)' }}>
+                    Day {day.day_number} — {day.date_display}
+                  </h4>
+                  <small style={{ color: 'var(--fg-3)', fontSize: '12px', marginLeft: '6px' }}>· {day.focus}</small>
+                </div>
+                {dayCompleted && (
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <CheckCircle2 size={13} /> Day Complete
+                  </span>
+                )}
+              </div>
+
+              {/* Tasks in this day */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(day.tasks || []).map((task) => {
+                  const isDone = Boolean(task.completed);
+                  return (
+                    <div
+                      key={task.id}
+                      onClick={() => handleToggleTask(task.id, isDone)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '12px 14px',
+                        borderRadius: '8px',
+                        background: isDone ? 'rgba(16,185,129,0.06)' : 'var(--bg)',
+                        border: isDone ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isDone}
+                        onChange={() => {}} // handled by parent onClick
+                        style={{ marginTop: '3px', cursor: 'pointer', accentColor: '#10b981' }}
+                      />
+
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                          <span
+                            style={{
+                              fontSize: '13.5px',
+                              fontWeight: 600,
+                              color: isDone ? 'var(--fg-3)' : 'var(--fg-1)',
+                              textDecoration: isDone ? 'line-through' : 'none'
+                            }}
+                          >
+                            {task.task_type}: {task.topic}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                background:
+                                  task.priority === 'weak'
+                                    ? '#fee2e2'
+                                    : task.priority === 'medium'
+                                    ? '#fef3c7'
+                                    : '#d1fae5',
+                                color:
+                                  task.priority === 'weak'
+                                    ? '#991b1b'
+                                    : task.priority === 'medium'
+                                    ? '#92400e'
+                                    : '#065f46',
+                                fontWeight: 600
+                              }}
+                            >
+                              {task.priority === 'weak' ? '🔴 High Priority' : task.priority === 'medium' ? '🟡 Core Review' : '🟢 Refresh'}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--fg-3)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Clock size={12} /> {task.estimated_minutes} min
+                            </span>
+                          </div>
+                        </div>
+
+                        {task.tips && (
+                          <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--fg-3)', lineHeight: 1.4 }}>
+                            💡 {task.tips}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Studio tools config                                                */
 /* ------------------------------------------------------------------ */
@@ -366,7 +1252,10 @@ const TOOLS = [
   { id: "cards", label: "Flashcards", desc: "Active-recall prompts for spaced repetition.", icon: Layers, generate: (id) => api.generateFlashcards(id), restore: api.getFlashcards },
   { id: "quiz", label: "Practice Quiz", desc: "Test your understanding with graded questions.", icon: CheckCircle2, generate: (id) => api.generateQuiz(id), restore: api.getQuizAttempts },
   { id: "map", label: "Knowledge Map", desc: "Visualize concepts and their connections.", icon: MapIcon, generate: api.generateMap, restore: api.getMap },
+  { id: "infographic", label: "Infographic", desc: "Structured visual concept diagrams, flows & revision sheets.", icon: LayoutTemplate, generate: (id) => api.generateInfographic(id, "concept_overview"), restore: (id) => api.getInfographic(id).then((r) => (r?.data ? r : null)) },
+  { id: "scheduler", label: "Revision Scheduler", desc: "Adaptive daily revision schedules adapted to your exam date and weak topics.", icon: Calendar, generate: (id) => api.getRevisionPlan(id).then((r) => (r?.plan_data ? r.plan_data : r)), restore: (id) => api.getRevisionPlan(id).then((r) => (r?.plan_data ? r.plan_data : r)) },
 ];
+
 
 /* ------------------------------------------------------------------ */
 /*  Source Selection Custom Dropdown                                   */
@@ -1147,6 +2036,33 @@ function Studio({
             {mode === "cards" && <FlashcardsRenderer data={result} onReview={reviewCard} onResetMode={() => setMode(null)} />}
             {mode === "quiz" && <QuizRenderer data={result} runSubmit={submitQuiz} submitting={busy} onResetMode={() => setMode(null)} />}
             {mode === "map" && <MapRenderer data={result} />}
+            {mode === "infographic" && (
+              <InfographicRenderer
+                data={result}
+                busy={busy}
+                currentType={result?.type || "concept_overview"}
+                onGenerateType={async (chosenType) => {
+                  if (!activeDocId) return;
+                  setBusy(true); setError("");
+                  try {
+                    const res = await api.generateInfographic(activeDocId, chosenType);
+                    setCache((c) => ({ ...c, [ck]: res }));
+                  } catch (e) {
+                    setError(e.message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            )}
+            {mode === "scheduler" && (
+              <RevisionScheduler
+                docId={activeDocId}
+                plan={result}
+                busy={busy}
+                onSavePlan={(updated) => setCache((c) => ({ ...c, [ck]: updated }))}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1174,6 +2090,64 @@ function Tutor({
   const [clearing, setClearing] = useState(false);
   const scrollRef = useRef(null);
 
+  // --- Voice Agent State & Handlers ---
+  const [voiceState, setVoiceState] = useState('idle'); // 'idle' | 'recording' | 'processing' | 'speaking' | 'error'
+  const [voiceError, setVoiceError] = useState(null);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [isMuted, setIsMuted] = useState(false);
+  const recognitionRef = useRef(null);
+  const wasVoiceRef = useRef(false);
+
+  const isSpeechRecSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const isSpeechSynthSupported = typeof window !== 'undefined' && Boolean(window.speechSynthesis);
+
+  // Stop speaking
+  const stopSpeaking = useCallback(() => {
+    if (isSpeechSynthSupported) {
+      window.speechSynthesis.cancel();
+    }
+    window._activeSpeechUtterance = null;
+    setVoiceState((prev) => (prev === 'speaking' ? 'idle' : prev));
+  }, [isSpeechSynthSupported]);
+
+  // Read response aloud via browser SpeechSynthesis
+  const speak = useCallback((rawContent) => {
+    if (!isSpeechSynthSupported || isMuted || !rawContent) return;
+    try {
+      window.speechSynthesis.cancel();
+      // Strip markdown code fences, headers, citations, and formulas for natural vocalization
+      const clean = rawContent
+        .replace(/#{1,6}\s+/g, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .replace(/`{1,3}[^`]*`{1,3}/g, '')
+        .replace(/\[(?:Page|Slide|Section)\s*[^\]]+\]/gi, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/\$\$?[^$]+\$\$?/g, 'formula')
+        .replace(/\n+/g, '. ')
+        .trim();
+
+      const utterance = new SpeechSynthesisUtterance(clean.slice(0, 3000));
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      // Store in window reference to prevent Chromium garbage collection bug
+      window._activeSpeechUtterance = utterance;
+      utterance.onstart = () => setVoiceState('speaking');
+      utterance.onend = () => {
+        window._activeSpeechUtterance = null;
+        setVoiceState((prev) => (prev === 'speaking' ? 'idle' : prev));
+      };
+      utterance.onerror = () => {
+        window._activeSpeechUtterance = null;
+        setVoiceState((prev) => (prev === 'speaking' ? 'idle' : prev));
+      };
+      setVoiceState('speaking');
+      window.speechSynthesis.speak(utterance);
+    } catch (_) {
+      setVoiceState('idle');
+    }
+  }, [isSpeechSynthSupported, isMuted]);
+
   useEffect(() => {
     let live = true;
     if (selected) {
@@ -1192,7 +2166,6 @@ function Tutor({
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  
   const clearChat = async () => {
     if (messages.length === 0) return;
     if (confirm("Are you sure you want to clear this conversation? This action cannot be undone.")) {
@@ -1215,27 +2188,143 @@ function Tutor({
     }
   };
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || busy) return;
+  const executeSubmit = async (textOverride = null) => {
+    const q = (textOverride || input).trim();
+    if (!q || busy) return;
     
     // Ensure an active session ID exists
     const currentSelected = selected || { id: "chat_" + Date.now(), name: "New Chat", is_chat: true };
-    const q = input;
     setInput("");
+    setLiveTranscript("");
     setMessages((x) => [...x, ["You", q, "you"]]);
     setBusy(true);
     try {
       const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
       const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId);
-      setMessages((x) => [...x, ["Study tutor", r.response || r.answer || r.content || text(r), ""]]);
+      const answerText = r.response || r.answer || r.content || text(r);
+      setMessages((x) => [...x, ["Study tutor", answerText, ""]]);
+      
+      // Auto-read aloud if user spoke the question
+      if (wasVoiceRef.current && !isMuted) {
+        speak(answerText);
+      }
+      wasVoiceRef.current = false;
+
       // Lightweight sidebar-only refresh — shows this chat instantly in Recent Chats
       if (refreshChats) refreshChats();
     } catch (err) {
       setMessages((x) => [...x, ["System", "Error: " + err.message, "error"]]);
     } finally {
       setBusy(false);
+      setVoiceState((prev) => (prev === 'processing' ? 'idle' : prev));
     }
+  };
+
+  // Start Voice Input (Recording & Continuous Speech Recognition)
+  const startRecording = async () => {
+    if (!isSpeechRecSupported) {
+      setVoiceError("Voice input is not supported in this browser. Try Google Chrome, Edge, or Safari.");
+      setVoiceState('error');
+      return;
+    }
+
+    stopSpeaking();
+    setVoiceError(null);
+
+    // Explicitly prompt and request microphone permission via getUserMedia
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    } catch (permErr) {
+      if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
+        setVoiceError("Microphone permission denied. Please allow microphone access in your browser settings (look for the lock or camera icon in the address bar).");
+      } else {
+        setVoiceError("Microphone device unavailable: " + (permErr.message || "Could not start audio stream"));
+      }
+      setVoiceState('error');
+      return;
+    }
+
+    // Clean up previous recognition instance
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch (_) {}
+    }
+
+    setVoiceState('recording');
+    setLiveTranscript('');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
+
+    recognition.onresult = (event) => {
+      let finalStr = '';
+      let interimStr = '';
+      for (let i = 0; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalStr += event.results[i][0].transcript;
+        } else {
+          interimStr += event.results[i][0].transcript;
+        }
+      }
+      const combined = (finalStr + (interimStr ? ' ' + interimStr : '')).trim();
+      setLiveTranscript(combined);
+      setInput(combined);
+      wasVoiceRef.current = true;
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setVoiceError("Microphone permission denied. Please click the lock or camera icon in your address bar to allow microphone access.");
+        setVoiceState('error');
+      } else if (event.error === 'no-speech') {
+        // Quietly keep waiting
+      } else if (event.error !== 'aborted') {
+        setVoiceError(`Voice recognition error (${event.error}). Please try speaking again.`);
+        setVoiceState('error');
+      }
+    };
+
+    recognition.onend = () => {
+      setVoiceState((prev) => (prev === 'recording' ? 'idle' : prev));
+    };
+
+    try {
+      recognition.start();
+    } catch (err) {
+      setVoiceError("Could not start microphone: " + err.message);
+      setVoiceState('error');
+    }
+  };
+
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (_) {}
+    }
+    setVoiceState('idle');
+  };
+
+  const submitVoiceNow = () => {
+    stopRecording();
+    const textToSend = (input || liveTranscript).trim();
+    if (textToSend) {
+      executeSubmit(textToSend);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch (_) {}
+    }
+    setVoiceState('idle');
+    setLiveTranscript('');
+    setInput('');
   };
 
   return (
@@ -1262,26 +2351,226 @@ function Tutor({
         )}
       </div>
 
+      {/* Voice Status Alert if error occurs */}
+      {voiceError && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--danger-bg)', color: 'var(--danger-fg)', padding: '8px 14px', borderRadius: '8px', fontSize: '12.5px', margin: '8px 0 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={15} />
+            <span>{voiceError}</span>
+          </div>
+          <button type="button" onClick={() => setVoiceError(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+        </div>
+      )}
+
       {/* Chat area — full width, no preview panel */}
       <div className="chat-container" ref={scrollRef}>
         {messages.length ? messages.map((m, i) => (
           <div key={i} className={`msg ${m[2]}`}>
-            <small>{m[0]}</small>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <small style={{ margin: 0 }}>{m[0]}</small>
+              {m[2] !== "you" && m[2] !== "error" && (
+                <button
+                  type="button"
+                  onClick={() => speak(m[1])}
+                  title="Read response aloud (Voice Output)"
+                  style={{ background: 'none', border: 'none', color: 'inherit', opacity: 0.65, cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10px' }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0.65'}
+                >
+                  <Volume2 size={13} />
+                </button>
+              )}
+            </div>
             <div className="msg-body"><Md>{m[1]}</Md></div>
           </div>
         )) : (
           <div className="chat-empty">
             <MessageCircle size={32} />
             <h2>What are you working through?</h2>
-            <p>Ask for an explanation, a memory trick, or a step-by-step walkthrough.</p>
+            <p>Ask for an explanation, memory trick, or step-by-step walkthrough by typing or speaking.</p>
           </div>
         )}
         {busy && <div className="msg"><small>Study tutor</small><p className="typing"><LoaderCircle className="spin" size={14} /> Thinking…</p></div>}
       </div>
 
-      <form className="chat-input" onSubmit={submit}>
-        <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your AI Tutor anything..." />
-        <button className="btn-send" disabled={busy || !input.trim()} type="submit"><Send size={18} /></button>
+      {/* Visible Listening State & Transcript Banner */}
+      {voiceState === 'recording' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--surface-2)',
+            border: '1px solid #ef4444',
+            borderRadius: '10px',
+            padding: '10px 14px',
+            margin: '0 0 10px',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '220px' }}>
+            <span
+              style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#ef4444',
+                boxShadow: '0 0 8px #ef4444'
+              }}
+            />
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Recording Voice Input
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--fg-1)', fontStyle: liveTranscript ? 'normal' : 'italic' }}>
+                {liveTranscript ? `“${liveTranscript}”` : "Listening... Speak your question clearly."}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={stopRecording}
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--fg-1)',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              Done Speaking
+            </button>
+            <button
+              type="button"
+              disabled={!input.trim()}
+              onClick={submitVoiceNow}
+              style={{
+                background: 'var(--green, #17372f)',
+                border: 'none',
+                color: '#fff',
+                padding: '5px 12px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                cursor: input.trim() ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <Send size={12} /> Send Now
+            </button>
+            <button
+              type="button"
+              onClick={cancelRecording}
+              title="Cancel recording"
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--fg-3)',
+                padding: '4px 6px',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      <form className="chat-input" onSubmit={(e) => { e.preventDefault(); executeSubmit(); }} style={{ position: 'relative' }}>
+        <input
+          disabled={busy}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={
+            voiceState === 'recording'
+              ? "🔴 Listening to your voice... Speak your question now."
+              : voiceState === 'processing'
+              ? "⏳ Transcribing your speech..."
+              : "Ask your AI Tutor anything (type or speak)..."
+          }
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingRight: '4px' }}>
+          {/* Voice Input Control Button */}
+          {voiceState === 'recording' ? (
+            <button
+              type="button"
+              onClick={stopRecording}
+              title="Stop listening"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: '#ef4444',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '7px 12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <Square size={13} fill="#fff" /> Stop
+            </button>
+          ) : voiceState === 'speaking' ? (
+            <button
+              type="button"
+              onClick={stopSpeaking}
+              title="Stop speaking"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                background: 'var(--green)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '7px 12px',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              <VolumeX size={15} /> Stop Audio
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={busy || voiceState === 'processing'}
+              onClick={startRecording}
+              title={isSpeechRecSupported ? "Click to speak your question (Voice Agent)" : "Voice input is not supported in this browser"}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: isSpeechRecSupported ? 'var(--surface-2)' : 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                width: '36px',
+                height: '36px',
+                color: isSpeechRecSupported ? 'var(--green)' : 'var(--fg-muted)',
+                cursor: isSpeechRecSupported ? 'pointer' : 'not-allowed',
+                opacity: busy ? 0.5 : 1
+              }}
+            >
+              <Mic size={17} />
+            </button>
+          )}
+
+          <button className="btn-send" disabled={busy || !input.trim()} type="submit" title="Send message">
+            <Send size={18} />
+          </button>
+        </div>
       </form>
     </section>
   );

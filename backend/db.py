@@ -130,6 +130,27 @@ def init_db():
             )
         """)
 
+        # Persist the latest generated infographic per material
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS infographics (
+                doc_id TEXT PRIMARY KEY,
+                infographic_type TEXT NOT NULL,
+                data TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (doc_id) REFERENCES materials (id) ON DELETE CASCADE
+            )
+        """)
+
+        # Persist Smart Revision Plans
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS revision_plans (
+                doc_id TEXT PRIMARY KEY,
+                plan_data TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (doc_id) REFERENCES materials (id) ON DELETE CASCADE
+            )
+        """)
+
         # 6. Activity Log
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS activity_log (
@@ -315,6 +336,97 @@ def get_knowledge_map(doc_id: str) -> Optional[Dict[str, Any]]:
         except (TypeError, json.JSONDecodeError):
             return None
         return data if isinstance(data, dict) else None
+
+def save_infographic(doc_id: str, infographic_type: str, data: Dict[str, Any]):
+    init_db()
+    now_str = datetime.now().strftime("%b %d, %H:%M")
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO infographics (doc_id, infographic_type, data, created_at) VALUES (?, ?, ?, ?)",
+            (doc_id, infographic_type, json.dumps(data), now_str)
+        )
+        conn.commit()
+
+def get_infographic(doc_id: str) -> Optional[Dict[str, Any]]:
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM infographics WHERE doc_id = ?", (doc_id,)).fetchone()
+        if not row:
+            return None
+        try:
+            data = json.loads(row["data"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return {
+            "doc_id": doc_id,
+            "type": row["infographic_type"],
+            "data": data,
+            "created_at": row["created_at"]
+        }
+
+# --- Revision Scheduler Operations ---
+
+def save_revision_plan(doc_id: str, plan_data: Dict[str, Any]):
+    init_db()
+    now_str = datetime.now().strftime("%b %d, %H:%M")
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO revision_plans (doc_id, plan_data, updated_at) VALUES (?, ?, ?)",
+            (doc_id, json.dumps(plan_data), now_str)
+        )
+        conn.commit()
+
+def get_revision_plan(doc_id: str) -> Optional[Dict[str, Any]]:
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM revision_plans WHERE doc_id = ?", (doc_id,)).fetchone()
+        if not row:
+            return None
+        try:
+            data = json.loads(row["plan_data"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return {
+            "doc_id": doc_id,
+            "plan_data": data,
+            "updated_at": row["updated_at"]
+        }
+
+def update_revision_task_status(doc_id: str, task_id: str, completed: bool) -> Optional[Dict[str, Any]]:
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM revision_plans WHERE doc_id = ?", (doc_id,)).fetchone()
+        if not row:
+            return None
+        try:
+            plan = json.loads(row["plan_data"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+
+        found = False
+        completed_count = 0
+        total_tasks = 0
+        for day in plan.get("days", []):
+            for task in day.get("tasks", []):
+                total_tasks += 1
+                if task.get("id") == task_id:
+                    task["completed"] = completed
+                    found = True
+                if task.get("completed"):
+                    completed_count += 1
+
+        if found:
+            plan["completion_percentage"] = round((completed_count / max(total_tasks, 1)) * 100)
+            plan["completed_tasks"] = completed_count
+            now_str = datetime.now().strftime("%b %d, %H:%M")
+            conn.execute(
+                "UPDATE revision_plans SET plan_data = ?, updated_at = ? WHERE doc_id = ?",
+                (json.dumps(plan), now_str, doc_id)
+            )
+            conn.commit()
+            return plan
+        return plan
+
 
 # --- Flashcards & SRS Operations ---
 
