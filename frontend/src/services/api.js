@@ -50,6 +50,11 @@ export const api = {
   // Tutor & Chats
   tutor: (id, message, level = "intermediate", sourceDocId = null) =>
     request("/tutor/chat", json({ doc_id: id, message, level, source_doc_id: sourceDocId })),
+  transcribeAudio: (audioBlob) => {
+    const body = new FormData();
+    body.append("file", audioBlob, "recording.webm");
+    return request("/tutor/transcribe", { method: "POST", body });
+  },
   getTutorHistory: (id) => request("/tutor/history/" + encodeURIComponent(id)),
   clearTutorHistory: (id) =>
     request("/tutor/history/" + encodeURIComponent(id), { method: "DELETE" }),

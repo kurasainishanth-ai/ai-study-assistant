@@ -453,6 +453,58 @@ def clear_tutor_history_endpoint(doc_id: str):
     db.clear_chat_history(doc_id)
     return {"success": True}
 
+@app.post("/api/tutor/transcribe")
+async def transcribe_audio_endpoint(file: UploadFile = File(...)):
+    """Transcribes user voice audio into text using Gemini multimodal or Deepgram."""
+    try:
+        content = await file.read()
+        if not content or len(content) < 100:
+            return {"transcript": ""}
+
+        # 1. Optional Deepgram integration if DEEPGRAM_API_KEY is provided
+        deepgram_key = os.getenv("DEEPGRAM_API_KEY")
+        if deepgram_key:
+            import urllib.request
+            import json
+            req = urllib.request.Request(
+                "https://api.deepgram.com/v1/listen?smart_format=true&model=nova-2",
+                data=content,
+                headers={
+                    "Authorization": f"Token {deepgram_key}",
+                    "Content-Type": file.content_type or "audio/webm",
+                },
+                method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    dg_res = json.loads(resp.read().decode())
+                    transcript = dg_res.get("results", {}).get("channels", [{}])[0].get("alternatives", [{}])[0].get("transcript", "")
+                    return {"transcript": transcript.strip()}
+            except Exception:
+                pass
+
+        # 2. Gemini Multimodal Audio Transcription
+        from google.genai import types
+        client = get_gemini_client()
+        mime_type = file.content_type or "audio/webm"
+        if ";" in mime_type:
+            mime_type = mime_type.split(";")[0].strip()
+        if not mime_type or mime_type == "application/octet-stream":
+            mime_type = "audio/webm"
+
+        response = client.models.generate_content(
+            model=DEFAULT_MODEL,
+            contents=[
+                types.Part.from_bytes(data=content, mime_type=mime_type),
+                "Transcribe the spoken audio question accurately into text. Output ONLY the transcription text with correct punctuation, and nothing else. If there is no discernible speech or only silence/background noise, return an empty string."
+            ]
+        )
+        transcript = (response.text or "").strip()
+        return {"transcript": transcript}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+
 
 # =========================================================
 # 6. Quiz Arena & Misconception Detector

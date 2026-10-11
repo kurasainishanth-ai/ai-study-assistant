@@ -2096,9 +2096,14 @@ function Tutor({
   const [liveTranscript, setLiveTranscript] = useState("");
   const [isMuted, setIsMuted] = useState(false);
   const recognitionRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const accumulatedTranscriptRef = useRef("");
   const wasVoiceRef = useRef(false);
 
   const isSpeechRecSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const isAudioCaptureSupported = typeof window !== 'undefined' && Boolean((navigator?.mediaDevices && navigator.mediaDevices.getUserMedia) || window.SpeechRecognition || window.webkitSpeechRecognition);
   const isSpeechSynthSupported = typeof window !== 'undefined' && Boolean(window.speechSynthesis);
 
   // Stop speaking
@@ -2222,99 +2227,201 @@ function Tutor({
 
   // Start Voice Input (Recording & Continuous Speech Recognition)
   const startRecording = async () => {
-    if (!isSpeechRecSupported) {
-      setVoiceError("Voice input is not supported in this browser. Try Google Chrome, Edge, or Safari.");
+    if (!isAudioCaptureSupported) {
+      setVoiceError("Voice input is not supported in this browser. Try Google Chrome, Edge, Firefox, or Safari.");
       setVoiceState('error');
       return;
     }
 
     stopSpeaking();
     setVoiceError(null);
+    setLiveTranscript('');
+    accumulatedTranscriptRef.current = '';
+    audioChunksRef.current = [];
 
-    // Explicitly prompt and request microphone permission via getUserMedia
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    } catch (permErr) {
-      if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
-        setVoiceError("Microphone permission denied. Please allow microphone access in your browser settings (look for the lock or camera icon in the address bar).");
-      } else {
-        setVoiceError("Microphone device unavailable: " + (permErr.message || "Could not start audio stream"));
-      }
-      setVoiceState('error');
-      return;
-    }
-
-    // Clean up previous recognition instance
+    // Clean up previous recognition or stream
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch (_) {}
     }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+    }
+
+    let stream = null;
+    if (navigator?.mediaDevices?.getUserMedia) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
+      } catch (permErr) {
+        if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
+          setVoiceError("Microphone permission denied. Please allow microphone access in your browser settings (look for the lock or camera icon in the address bar).");
+        } else {
+          setVoiceError("Microphone device unavailable: " + (permErr.message || "Could not start audio stream"));
+        }
+        setVoiceState('error');
+        return;
+      }
+    }
 
     setVoiceState('recording');
-    setLiveTranscript('');
+    wasVoiceRef.current = true;
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    recognitionRef.current = recognition;
-
-    recognition.onresult = (event) => {
-      let finalStr = '';
-      let interimStr = '';
-      for (let i = 0; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalStr += event.results[i][0].transcript;
-        } else {
-          interimStr += event.results[i][0].transcript;
-        }
+    // Start MediaRecorder if stream is available
+    if (stream && typeof MediaRecorder !== 'undefined') {
+      let mimeType = 'audio/webm';
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+        else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+        else mimeType = '';
       }
-      const combined = (finalStr + (interimStr ? ' ' + interimStr : '')).trim();
-      setLiveTranscript(combined);
-      setInput(combined);
-      wasVoiceRef.current = true;
-    };
-
-    recognition.onerror = (event) => {
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        setVoiceError("Microphone permission denied. Please click the lock or camera icon in your address bar to allow microphone access.");
-        setVoiceState('error');
-      } else if (event.error === 'no-speech') {
-        // Quietly keep waiting
-      } else if (event.error !== 'aborted') {
-        setVoiceError(`Voice recognition error (${event.error}). Please try speaking again.`);
-        setVoiceState('error');
+      try {
+        const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+        recorder.start(250);
+      } catch (recErr) {
+        console.warn("MediaRecorder start warning:", recErr);
       }
-    };
+    }
 
-    recognition.onend = () => {
-      setVoiceState((prev) => (prev === 'recording' ? 'idle' : prev));
-    };
+    // Start Web Speech API concurrently for real-time live typing
+    if (isSpeechRecSupported) {
+      try {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognitionRef.current = recognition;
 
-    try {
-      recognition.start();
-    } catch (err) {
-      setVoiceError("Could not start microphone: " + err.message);
-      setVoiceState('error');
+        recognition.onresult = (event) => {
+          let currentFinal = '';
+          let currentInterim = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            const item = event.results[i];
+            if (item.isFinal) {
+              currentFinal += item[0].transcript + ' ';
+            } else {
+              currentInterim += item[0].transcript;
+            }
+          }
+          const fullText = (currentFinal + currentInterim).trim();
+          if (fullText) {
+            accumulatedTranscriptRef.current = fullText;
+            setLiveTranscript(fullText);
+            setInput(fullText);
+            wasVoiceRef.current = true;
+          }
+        };
+
+        recognition.onerror = (event) => {
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            setVoiceError("Microphone permission denied. Please allow microphone access in your browser settings.");
+          } else if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            console.warn("Speech recognition warning:", event.error);
+          }
+        };
+
+        recognition.onend = () => {
+          // If ended naturally without explicit stop
+        };
+
+        recognition.start();
+      } catch (speechErr) {
+        console.warn("SpeechRecognition start warning:", speechErr);
+      }
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = async (autoSubmit = false) => {
+    // 1. Stop SpeechRecognition
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch (_) {}
     }
-    setVoiceState('idle');
+
+    // 2. Stop MediaRecorder and wait for last chunks
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      await new Promise((resolve) => {
+        recorder.onstop = resolve;
+        try { recorder.stop(); } catch (_) { resolve(); }
+      });
+    }
+
+    // 3. Stop all audio tracks from stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+
+    // 4. Check if we already have speech text from live speech recognition
+    const speechText = (accumulatedTranscriptRef.current || input || liveTranscript).trim();
+
+    if (speechText) {
+      if (autoSubmit) {
+        setVoiceState('idle');
+        executeSubmit(speechText);
+      } else {
+        setVoiceState('idle');
+      }
+      return;
+    }
+
+    // 5. If Web Speech API produced nothing or was silent, run backend audio transcription fallback
+    const chunks = audioChunksRef.current;
+    if (chunks && chunks.length > 0) {
+      const mime = recorder?.mimeType || 'audio/webm';
+      const audioBlob = new Blob(chunks, { type: mime });
+      if (audioBlob.size > 200) {
+        setVoiceState('processing');
+        try {
+          const res = await api.transcribeAudio(audioBlob);
+          const serverText = (res.transcript || '').trim();
+          if (serverText) {
+            accumulatedTranscriptRef.current = serverText;
+            setLiveTranscript(serverText);
+            setInput(serverText);
+            wasVoiceRef.current = true;
+            if (autoSubmit) {
+              setVoiceState('idle');
+              executeSubmit(serverText);
+            } else {
+              setVoiceState('idle');
+            }
+            return;
+          } else {
+            setVoiceError("No speech detected. Please speak closer to your microphone and try again.");
+            setVoiceState('error');
+            return;
+          }
+        } catch (transcribeErr) {
+          setVoiceError("Voice transcription failed: " + (transcribeErr.message || "Unknown error"));
+          setVoiceState('error');
+          return;
+        }
+      }
+    }
+
+    // If no chunks or no speech
+    setVoiceError("No speech detected. Please speak clearly into your microphone and try again.");
+    setVoiceState('error');
   };
 
   const submitVoiceNow = () => {
-    stopRecording();
-    const textToSend = (input || liveTranscript).trim();
-    if (textToSend) {
-      executeSubmit(textToSend);
+    if (voiceState === 'recording') {
+      stopRecording(true);
+    } else {
+      const textToSend = (input || liveTranscript).trim();
+      if (textToSend) {
+        executeSubmit(textToSend);
+      }
     }
   };
 
@@ -2322,8 +2429,17 @@ function Tutor({
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch (_) {}
     }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch (_) {}
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
     setVoiceState('idle');
     setLiveTranscript('');
+    accumulatedTranscriptRef.current = '';
+    audioChunksRef.current = [];
     setInput('');
   };
 
@@ -2432,7 +2548,7 @@ function Tutor({
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               type="button"
-              onClick={stopRecording}
+              onClick={() => stopRecording(false)}
               style={{
                 background: 'var(--bg)',
                 border: '1px solid var(--border)',
@@ -2448,7 +2564,6 @@ function Tutor({
             </button>
             <button
               type="button"
-              disabled={!input.trim()}
               onClick={submitVoiceNow}
               style={{
                 background: 'var(--green, #17372f)',
@@ -2458,7 +2573,7 @@ function Tutor({
                 borderRadius: '6px',
                 fontSize: '11.5px',
                 fontWeight: 600,
-                cursor: input.trim() ? 'pointer' : 'not-allowed',
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px'
@@ -2485,6 +2600,35 @@ function Tutor({
         </div>
       )}
 
+      {/* Processing / Transcribing Voice Banner */}
+      {voiceState === 'processing' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--primary, #10b981)',
+            borderRadius: '10px',
+            padding: '10px 14px',
+            margin: '0 0 10px',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <LoaderCircle className="spin" size={16} style={{ color: 'var(--primary, #10b981)' }} />
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary, #10b981)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Transcribing Voice
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--fg-1)' }}>
+                Converting your speech to text...
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form className="chat-input" onSubmit={(e) => { e.preventDefault(); executeSubmit(); }} style={{ position: 'relative' }}>
         <input
           disabled={busy}
@@ -2504,7 +2648,7 @@ function Tutor({
           {voiceState === 'recording' ? (
             <button
               type="button"
-              onClick={stopRecording}
+              onClick={() => stopRecording(false)}
               title="Stop listening"
               style={{
                 display: 'inline-flex',
@@ -2548,18 +2692,18 @@ function Tutor({
               type="button"
               disabled={busy || voiceState === 'processing'}
               onClick={startRecording}
-              title={isSpeechRecSupported ? "Click to speak your question (Voice Agent)" : "Voice input is not supported in this browser"}
+              title={isAudioCaptureSupported ? "Click to speak your question (Voice Agent)" : "Voice input is not supported in this browser"}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: isSpeechRecSupported ? 'var(--surface-2)' : 'transparent',
+                background: isAudioCaptureSupported ? 'var(--surface-2)' : 'transparent',
                 border: '1px solid var(--border)',
                 borderRadius: '8px',
                 width: '36px',
                 height: '36px',
-                color: isSpeechRecSupported ? 'var(--green)' : 'var(--fg-muted)',
-                cursor: isSpeechRecSupported ? 'pointer' : 'not-allowed',
+                color: isAudioCaptureSupported ? 'var(--green)' : 'var(--fg-muted)',
+                cursor: isAudioCaptureSupported ? 'pointer' : 'not-allowed',
                 opacity: busy ? 0.5 : 1
               }}
             >
