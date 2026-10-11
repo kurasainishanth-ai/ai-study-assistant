@@ -238,6 +238,10 @@ def load_sample_material():
     """Loads sample_notes.txt into SQLite."""
     sample_path = "sample_notes.txt"
     if not os.path.exists(sample_path):
+        sample_path = os.path.join("sample_data", "sample_notes.txt")
+    if not os.path.exists(sample_path):
+        sample_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sample_data", "sample_notes.txt")
+    if not os.path.exists(sample_path):
         raise HTTPException(status_code=404, detail="sample_notes.txt not found")
     
     size_kb = round(os.path.getsize(sample_path) / 1024, 1)
