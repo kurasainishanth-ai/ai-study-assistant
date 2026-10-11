@@ -1,0 +1,34 @@
+4] ---
+Maximum-a-Posteriori
+By Bayes Theorem again:
+pΘ|X(θ|xn) = pX|Θ(xn|θ)pΘ(θ)
+pX(xn)
+.
+To maximize the posterior distribution
+bθ = argmax
+θ
+pΘ|X(θ|D)
+= argmax
+θ
+N
+Y
+n=1
+pΘ|X(θ|xn)
+= argmax
+θ
+N
+Y
+n=1
+pX|Θ(xn|θ)pΘ(θ)
+
+pX(xn)
+= argmin
+θ
+−
+N
+X
+n=1
+n
+log pX|Θ(xn|θ) + log pΘ(θ)
+o
+
