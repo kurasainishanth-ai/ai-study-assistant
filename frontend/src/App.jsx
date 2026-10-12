@@ -4,7 +4,7 @@ import {
   LayoutDashboard, LoaderCircle, MessageCircle, Plus, RefreshCw, Send,
   Sparkles, Trash2, Upload, WandSparkles, X, RotateCcw,
   CheckCircle2, XCircle, Map as MapIcon, Layers, FileText,
-  AlertTriangle, Check, ArrowLeft
+  AlertTriangle, Check, ArrowLeft, Video, Play, ExternalLink, Clock
 } from "lucide-react";
 import { api } from "./services/api";
 import ReactMarkdown from "react-markdown";
@@ -19,6 +19,24 @@ import ForceGraph2D from "react-force-graph-2d";
 /* ------------------------------------------------------------------ */
 
 const text = (v) => (typeof v === "string" ? v : JSON.stringify(v, null, 2));
+
+const extractYoutubeId = (urlOrId) => {
+  if (!urlOrId) return null;
+  const match = urlOrId.match(/(?:v=|\/vi\/|embed\/|shorts\/|youtu\.be\/|\/v\/)([0-9A-Za-z_-]{11})/);
+  if (match) return match[1];
+  if (/^[0-9A-Za-z_-]{11}$/.test(urlOrId.trim())) return urlOrId.trim();
+  return null;
+};
+
+const parseTimestampSeconds = (tsStr) => {
+  if (!tsStr) return 0;
+  const match = tsStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return 0;
+  if (match[3] !== undefined) {
+    return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]);
+  }
+  return parseInt(match[1]) * 60 + parseInt(match[2]);
+};
 
 const Md = ({ children }) => (
   <div className="md-body">
@@ -581,6 +599,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [cache, setCache] = useState({});          // keyed "docId_toolId"
+  const [activeVideoModal, setActiveVideoModal] = useState(null); // { material, seconds }
   const fileRef = useRef(null);
 
   const refresh = useCallback(async () => {
@@ -687,6 +706,41 @@ export default function App() {
     try { await api.upload(file); await refresh(); setShowUpload(false); setView("library"); }
     catch (e) { setNotice(e.message); }
     finally { setBusy(false); }
+  };
+
+  const ingestYoutube = async (url) => {
+    setBusy(true);
+    try {
+      const res = await api.ingestYoutube(url);
+      await refresh();
+      setShowUpload(false);
+      if (res && res.material) {
+        setSelected(res.material);
+        setSelectedSourceIds([res.material.id]);
+      }
+      setView("library");
+    } catch (e) {
+      setNotice(e.message);
+      throw e;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCitationClick = (citationText) => {
+    const seconds = parseTimestampSeconds(citationText);
+    let targetMat = null;
+    if (selected && !selected.is_chat) {
+      targetMat = selected;
+    } else if (selected?.source_doc_id) {
+      targetMat = materials.find((m) => m.id === selected.source_doc_id);
+    }
+    if (!targetMat || (!targetMat.metadata?.youtube_id && !targetMat.source_url)) {
+      targetMat = materials.find((m) => m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url);
+    }
+    if (targetMat) {
+      setActiveVideoModal({ material: targetMat, seconds });
+    }
   };
 
   const handleNavClick = (id) => {
@@ -827,7 +881,17 @@ export default function App() {
         </header>
         {notice && <div className="notice">{notice}<button className="btn-icon" onClick={() => setNotice("")}><X size={16} /></button></div>}
         {view === "home" && <Home materials={materials} selected={selected} choose={setSelected} go={setView} upload={() => setShowUpload(true)} />}
-        {view === "library" && <Library materials={materials} selected={selected} choose={setSelected} refresh={refresh} warn={setNotice} upload={() => setShowUpload(true)} />}
+        {view === "library" && (
+          <Library
+            materials={materials}
+            selected={selected}
+            choose={setSelected}
+            refresh={refresh}
+            warn={setNotice}
+            upload={() => setShowUpload(true)}
+            onOpenVideo={(mat) => setActiveVideoModal({ material: mat, seconds: 0 })}
+          />
+        )}
         {view === "studio" && (
           <Studio
             selected={selected}
@@ -853,11 +917,41 @@ export default function App() {
             onToggleSource={onToggleSource}
             onSelectAllSources={onSelectAllSources}
             onDeleteSource={onDeleteSource}
+            onCitationClick={handleCitationClick}
           />
         )}
       </main>
 
-      {showUpload && <UploadModal busy={busy} close={() => setShowUpload(false)} choose={() => fileRef.current.click()} sample={async () => { setBusy(true); try { await api.sample(); await refresh(); setShowUpload(false); setView("library"); } catch (e) { setNotice(e.message); } finally { setBusy(false); } }} />}
+      {showUpload && (
+        <UploadModal
+          busy={busy}
+          close={() => setShowUpload(false)}
+          choose={() => fileRef.current.click()}
+          sample={async () => {
+            setBusy(true);
+            try {
+              await api.sample();
+              await refresh();
+              setShowUpload(false);
+              setView("library");
+            } catch (e) {
+              setNotice(e.message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+          onIngestYoutube={ingestYoutube}
+        />
+      )}
+
+      {activeVideoModal && (
+        <VideoPlayerModal
+          material={activeVideoModal.material}
+          initialSeconds={activeVideoModal.seconds || 0}
+          onClose={() => setActiveVideoModal(null)}
+        />
+      )}
+
       <input className="hidden" ref={fileRef} type="file" onChange={(e) => upload(e.target.files?.[0])} />
     </div>
   );
@@ -892,7 +986,7 @@ function Home({ materials, selected, choose, go, upload }) {
         <div className="grid">
           {materials.slice(0, 3).map((m) => (
             <button key={m.id} className={`material${selected?.id === m.id ? " selected" : ""}`} onClick={() => choose(m)}>
-              <FileIcon /><span><b>{m.name}</b><small>{m.type} · {m.size_kb} KB</small></span><ChevronRight size={17} />
+              <FileIcon type={m.type} /><span><b>{m.name}</b><small>{m.type} · {m.size_kb} KB</small></span><ChevronRight size={17} />
             </button>
           ))}
         </div>
@@ -909,7 +1003,16 @@ function SectionTitle({ title, action }) {
     </div>
   );
 }
-function FileIcon() { return <i className="file"><BookOpen size={19} /></i>; }
+function FileIcon({ type }) {
+  if (type === "YouTube Lecture" || type === "Video Lecture") {
+    return (
+      <i className="file video" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+        <Video size={19} />
+      </i>
+    );
+  }
+  return <i className="file"><BookOpen size={19} /></i>;
+}
 function EmptyState({ upload }) {
   return (
     <div className="empty">
@@ -924,7 +1027,7 @@ function EmptyState({ upload }) {
 /*  Library                                                            */
 /* ------------------------------------------------------------------ */
 
-function Library({ materials, selected, choose, refresh, warn, upload }) {
+function Library({ materials, selected, choose, refresh, warn, upload, onOpenVideo }) {
   const remove = async (m) => {
     if (!confirm("Remove '" + m.name + "' and its generated study work?")) return;
     try { await api.remove(m.id); await refresh(); } catch (e) { warn(e.message); }
@@ -937,15 +1040,45 @@ function Library({ materials, selected, choose, refresh, warn, upload }) {
       </div>
       {materials.length ? (
         <div className="list">
-          {materials.map((m) => (
-            <article key={m.id} onClick={() => choose(m)} className={selected?.id === m.id ? "selected" : ""}>
-              <FileIcon />
-              <span className="name"><b>{m.name}</b><small>{m.type} · uploaded {m.upload_time}</small></span>
-              <i className={`status ${m.status?.toLowerCase()}`}>{m.status}</i>
-              <small className="size">{m.size_kb} KB</small>
-              <button className="btn-icon-danger" onClick={(e) => { e.stopPropagation(); remove(m); }}><Trash2 size={17} /></button>
-            </article>
-          ))}
+          {materials.map((m) => {
+            const isYt = m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url?.includes("youtube") || m.source_url?.includes("youtu.be");
+            return (
+              <article key={m.id} onClick={() => choose(m)} className={selected?.id === m.id ? "selected" : ""}>
+                <FileIcon type={m.type} />
+                <span className="name">
+                  <b>{m.name}</b>
+                  <small>{m.type} · uploaded {m.upload_time}</small>
+                </span>
+                {isYt && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      color: '#ef4444',
+                      fontSize: 12,
+                      padding: '4px 10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      borderRadius: 6,
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: 'rgba(239, 68, 68, 0.08)'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenVideo && onOpenVideo(m);
+                    }}
+                    title="Watch video & view timestamped transcript"
+                  >
+                    <Play size={12} fill="#ef4444" /> Watch & Transcripts
+                  </button>
+                )}
+                <i className={`status ${m.status?.toLowerCase()}`}>{m.status}</i>
+                <small className="size">{m.size_kb} KB</small>
+                <button className="btn-icon-danger" onClick={(e) => { e.stopPropagation(); remove(m); }}><Trash2 size={17} /></button>
+              </article>
+            );
+          })}
         </div>
       ) : <EmptyState upload={upload} />}
     </section>
@@ -1166,7 +1299,8 @@ function Tutor({
   selectedSourceIds,
   onToggleSource,
   onSelectAllSources,
-  onDeleteSource
+  onDeleteSource,
+  onCitationClick
 }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -1179,7 +1313,12 @@ function Tutor({
     if (selected) {
       api.getTutorHistory(selected.id).then((hist) => {
         if (live && Array.isArray(hist)) {
-          setMessages(hist.map((h) => [h.role === "user" ? "You" : "Study tutor", h.content, h.role === "user" ? "you" : ""]));
+          setMessages(hist.map((h) => [
+            h.role === "user" ? "You" : "Study tutor",
+            h.content,
+            h.role === "user" ? "you" : "",
+            h.citations ? (typeof h.citations === "string" ? JSON.parse(h.citations) : h.citations) : []
+          ]));
         }
       }).catch(() => null);
     } else {
@@ -1192,7 +1331,6 @@ function Tutor({
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  
   const clearChat = async () => {
     if (messages.length === 0) return;
     if (confirm("Are you sure you want to clear this conversation? This action cannot be undone.")) {
@@ -1219,7 +1357,6 @@ function Tutor({
     e.preventDefault();
     if (!input.trim() || busy) return;
     
-    // Ensure an active session ID exists
     const currentSelected = selected || { id: "chat_" + Date.now(), name: "New Chat", is_chat: true };
     const q = input;
     setInput("");
@@ -1228,8 +1365,9 @@ function Tutor({
     try {
       const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
       const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId);
-      setMessages((x) => [...x, ["Study tutor", r.response || r.answer || r.content || text(r), ""]]);
-      // Lightweight sidebar-only refresh — shows this chat instantly in Recent Chats
+      const answerText = r.response || r.answer || r.content || text(r);
+      const citList = (r.citations && r.citations.length) ? r.citations : Array.from(new Set(answerText.match(/\[(?:(?:Page|Slide|Section)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || []));
+      setMessages((x) => [...x, ["Study tutor", answerText, "", citList]]);
       if (refreshChats) refreshChats();
     } catch (err) {
       setMessages((x) => [...x, ["System", "Error: " + err.message, "error"]]);
@@ -1262,14 +1400,51 @@ function Tutor({
         )}
       </div>
 
-      {/* Chat area — full width, no preview panel */}
+      {/* Chat area */}
       <div className="chat-container" ref={scrollRef}>
-        {messages.length ? messages.map((m, i) => (
-          <div key={i} className={`msg ${m[2]}`}>
-            <small>{m[0]}</small>
-            <div className="msg-body"><Md>{m[1]}</Md></div>
-          </div>
-        )) : (
+        {messages.length ? messages.map((m, i) => {
+          const citList = Array.isArray(m[3]) && m[3].length ? m[3] : (m[2] !== "you" ? Array.from(new Set(String(m[1]).match(/\[(?:(?:Page|Slide|Section)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || [])) : []);
+          return (
+            <div key={i} className={`msg ${m[2]}`}>
+              <small>{m[0]}</small>
+              <div className="msg-body">
+                <Md>{m[1]}</Md>
+                {citList.length > 0 && m[2] !== "you" && (
+                  <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <small style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600 }}>Sources:</small>
+                    {citList.map((cit, ci) => {
+                      const isTimestamp = /\d{1,2}:\d{2}/.test(cit);
+                      return (
+                        <button
+                          key={ci}
+                          type="button"
+                          onClick={() => onCitationClick && onCitationClick(cit)}
+                          style={{
+                            padding: '3px 9px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            borderRadius: 12,
+                            border: '1px solid ' + (isTimestamp ? 'rgba(239,68,68,0.35)' : 'var(--border)'),
+                            background: isTimestamp ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
+                            color: isTimestamp ? '#ef4444' : 'var(--primary, #10b981)',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                          title={isTimestamp ? "Click to jump video to timestamp" : "Source citation"}
+                        >
+                          {isTimestamp && <Play size={10} fill="#ef4444" />}
+                          {cit}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }) : (
           <div className="chat-empty">
             <MessageCircle size={32} />
             <h2>What are you working through?</h2>
@@ -1288,23 +1463,295 @@ function Tutor({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Interactive Video Player Modal                                     */
+/* ------------------------------------------------------------------ */
+
+function VideoPlayerModal({ material, initialSeconds = 0, onClose }) {
+  const [seekTime, setSeekTime] = useState(initialSeconds);
+  const [search, setSearch] = useState("");
+  const youtubeId = material?.metadata?.youtube_id || extractYoutubeId(material?.source_url) || extractYoutubeId(material?.id);
+
+  let segments = material?.metadata?.segments || [];
+  if ((!segments || !segments.length) && material?.content) {
+    const lines = material.content.split('\n');
+    segments = [];
+    for (const line of lines) {
+      const m = line.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.+)$/);
+      if (m) {
+        segments.push({
+          timestamp: m[1],
+          seconds: parseTimestampSeconds(m[1]),
+          text: m[2]
+        });
+      }
+    }
+  }
+
+  const filteredSegments = segments.filter((s) =>
+    !search || s.text.toLowerCase().includes(search.toLowerCase()) || s.timestamp.includes(search)
+  );
+
+  const formatSecs = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  return (
+    <div className="back" style={{ zIndex: 1000 }}>
+      <div className="modal video-modal" style={{ maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+        <button className="btn-icon close-btn" onClick={onClose}><X size={18} /></button>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, paddingRight: 30 }}>
+          <span style={{ background: '#ef4444', color: '#fff', padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, letterSpacing: '0.05em' }}>
+            YOUTUBE LECTURE
+          </span>
+          <h3 style={{ margin: 0, fontSize: 17, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {material?.name}
+          </h3>
+          {material?.metadata?.duration_formatted && (
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <Clock size={13} /> {material.metadata.duration_formatted}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 1.4fr) minmax(280px, 1fr)', gap: 18, flex: 1, minHeight: 0 }}>
+          {/* Left: Video Player */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+              {youtubeId ? (
+                <iframe
+                  key={seekTime}
+                  src={`https://www.youtube.com/embed/${youtubeId}?start=${seekTime}&autoplay=1`}
+                  title={material?.name || "YouTube Video"}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  Video preview unavailable
+                </div>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--fg-3)' }}>
+              <span>Seeking position: <b style={{ color: '#ef4444' }}>{formatSecs(seekTime)}</b></span>
+              {material?.source_url && (
+                <a href={material.source_url} target="_blank" rel="noreferrer" style={{ color: 'var(--fg-2)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                  Open on YouTube <ExternalLink size={12} />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Timestamped transcript */}
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface-2, rgba(255,255,255,0.02))' }}>
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <b style={{ fontSize: 13 }}>Timestamped Transcript ({segments.length} units)</b>
+            </div>
+            <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
+              <input
+                type="text"
+                placeholder="Search transcript by keyword or MM:SS..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--fg-1)' }}
+              />
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+              {filteredSegments.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', marginTop: 24 }}>No matching transcript segments found</p>
+              ) : (
+                filteredSegments.map((s, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setSeekTime(s.seconds)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      marginBottom: 6,
+                      background: seekTime === s.seconds ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.03)',
+                      borderLeft: seekTime === s.seconds ? '3px solid #ef4444' : '3px solid transparent',
+                      transition: 'background 0.15s'
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, color: '#ef4444', marginRight: 8, fontFamily: 'monospace', fontSize: 11.5 }}>
+                      [{s.timestamp}]
+                    </span>
+                    <span style={{ color: 'var(--fg-2)', lineHeight: 1.45 }}>{s.text}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Upload Modal                                                       */
 /* ------------------------------------------------------------------ */
 
-function UploadModal({ busy, close, choose, sample }) {
+function UploadModal({ busy, close, choose, sample, onIngestYoutube }) {
+  const [tab, setTab] = useState("file"); // "file" | "youtube"
+  const [ytUrl, setYtUrl] = useState("");
+  const [ytError, setYtError] = useState("");
+
+  const handleYtSubmit = async (e) => {
+    e.preventDefault();
+    if (!ytUrl.trim() || busy) return;
+    setYtError("");
+    try {
+      await onIngestYoutube(ytUrl.trim());
+    } catch (err) {
+      setYtError(err.message || "Failed to ingest YouTube video");
+    }
+  };
+
+  const loadPreset = (url) => {
+    setYtUrl(url);
+    setYtError("");
+  };
+
   return (
     <div className="back">
-      <div className="modal">
+      <div className="modal" style={{ maxWidth: '520px' }}>
         <button className="btn-icon close-btn" onClick={close}><X size={18} /></button>
-        <small className="pill">ADD A SOURCE</small>
-        <h2>Bring in your study material</h2>
-        <p>PDFs, documents, slides, text files, and images are all welcome.</p>
-        <button className="drop" disabled={busy} onClick={choose}>
-          {busy ? <LoaderCircle className="spin" size={27} /> : <Upload size={27} />}
-          <b>{busy ? "Adding material…" : "Choose a file"}</b>
-          <small>or drag and drop it here</small>
-        </button>
-        <button className="btn-link sample" disabled={busy} onClick={sample}>Try with sample notes <ChevronRight size={16} /></button>
+        <small className="pill">ADD STUDY MATERIAL</small>
+        <h2>Bring in your course material</h2>
+
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', gap: 8, margin: '16px 0 20px', background: 'var(--bg-2, rgba(255,255,255,0.05))', padding: 4, borderRadius: 8 }}>
+          <button
+            type="button"
+            onClick={() => setTab("file")}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: 'none',
+              background: tab === "file" ? 'var(--primary, #10b981)' : 'transparent',
+              color: tab === "file" ? '#fff' : 'var(--fg-2)',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            <Upload size={15} /> Document / File
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("youtube")}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: 'none',
+              background: tab === "youtube" ? '#ef4444' : 'transparent',
+              color: tab === "youtube" ? '#fff' : 'var(--fg-2)',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            <Video size={15} /> YouTube Video
+          </button>
+        </div>
+
+        {tab === "file" ? (
+          <div>
+            <p style={{ color: 'var(--fg-2)', fontSize: 13, marginBottom: 16 }}>
+              PDFs, slide decks (PPTX), Word documents, images, and text notes.
+            </p>
+            <button className="drop" disabled={busy} onClick={choose}>
+              {busy ? <LoaderCircle className="spin" size={27} /> : <Upload size={27} />}
+              <b>{busy ? "Adding material…" : "Choose a file"}</b>
+              <small>or drag and drop it here</small>
+            </button>
+            <button className="btn-link sample" disabled={busy} onClick={sample}>
+              Try with sample notes <ChevronRight size={16} />
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p style={{ color: 'var(--fg-2)', fontSize: 13, marginBottom: 12 }}>
+              Paste any lecture or educational video URL. We will automatically ingest, extract timestamped transcript units, and ground all study materials in it.
+            </p>
+
+            <form onSubmit={handleYtSubmit}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={ytUrl}
+                  onChange={(e) => setYtUrl(e.target.value)}
+                  disabled={busy}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-2)',
+                    color: 'var(--fg-1)',
+                    fontSize: 13
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !ytUrl.trim()}
+                  className="btn-primary"
+                  style={{ background: '#ef4444', borderColor: '#ef4444', whiteSpace: 'nowrap' }}
+                >
+                  {busy ? <><LoaderCircle className="spin" size={15} /> Ingesting…</> : <><Play size={15} fill="#fff" /> Ingest Video</>}
+                </button>
+              </div>
+            </form>
+
+            {ytError && (
+              <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 12, padding: '8px 10px', borderRadius: 6, background: 'rgba(239,68,68,0.1)' }}>
+                {ytError}
+              </div>
+            )}
+
+            <div style={{ marginTop: 14 }}>
+              <small style={{ fontSize: 11, color: 'var(--fg-3)', display: 'block', marginBottom: 6 }}>
+                Or try a sample lecture:
+              </small>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => loadPreset("https://www.youtube.com/watch?v=aircAruvnKk")}
+                  className="btn-ghost"
+                  style={{ textAlign: 'left', padding: '6px 8px', fontSize: 12, justifyContent: 'flex-start' }}
+                >
+                  📺 <b>3Blue1Brown</b> — What is a Neural Network? (18m)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadPreset("https://www.youtube.com/watch?v=9vKqVkMQHKk")}
+                  className="btn-ghost"
+                  style={{ textAlign: 'left', padding: '6px 8px', fontSize: 12, justifyContent: 'flex-start' }}
+                >
+                  📺 <b>Khan Academy</b> — Derivative as slope of curve (9m)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

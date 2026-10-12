@@ -55,7 +55,7 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate", source
         "Strictly adhere to these rules:\n"
         "1. GROUNDING: Answer using ONLY the factual content provided in the study material below. "
         "If the material does NOT contain enough information to answer, explicitly state: 'The uploaded study material does not contain sufficient information to answer this question.'\n"
-        "2. CITATIONS: Whenever stating a fact or concept, cite the exact source marker from the text if available, like [Page X], [Slide Y], or [Section Title].\n"
+        "2. CITATIONS: Whenever stating a fact or concept, cite the exact source marker from the text if available, like [Page X], [Slide Y], [Section Title], or exact timestamp like [MM:SS] (for video lectures).\n"
         f"3. TONE & DEPTH: {level_guide}\n"
         "4. PEDAGOGY: Break complex thoughts into logical steps, provide helpful analogies, and invite thoughtful follow-ups."
     )
@@ -67,7 +67,7 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate", source
         f"{history_str}\n\n"
         f"STUDENT QUESTION:\n"
         f"{question}\n\n"
-        "TUTOR RESPONSE (Include citations like [Page X] or [Slide Y] where applicable):"
+        "TUTOR RESPONSE (Include citations like [Page X], [Slide Y], or [MM:SS] timestamp where applicable):"
     )
 
     from services.gemini_caller import call_gemini_with_retry
@@ -77,8 +77,8 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate", source
         temperature=0.3
     )
 
-    # Extract citations like [Page 1], [Slide 2], etc.
-    citations = list(set(re.findall(r"\[(?:Page|Slide|Section)\s*[^\]]+\]", answer_text, re.IGNORECASE)))
+    # Extract citations like [Page 1], [Slide 2], [01:23], etc.
+    citations = list(set(re.findall(r"\[(?:(?:Page|Slide|Section)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]", answer_text, re.IGNORECASE)))
 
     # Persist messages in SQLite
     db.save_chat_message(doc_id=doc_id, role="user", content=question, level=level)

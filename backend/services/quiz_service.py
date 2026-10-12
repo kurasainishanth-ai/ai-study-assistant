@@ -28,7 +28,7 @@ def generate_quiz(doc_id: str, num_questions: int = 5, difficulty: str = "medium
         '    "correct_answer": "Exact correct option or answer text",\n'
         '    "rationale": "Clear explanation of why this answer is correct and why common traps fail",\n'
         '    "topic": "Specific subtopic tested",\n'
-        '    "source_ref": "Page X or Slide Y if identifiable"\n'
+        '    "source_ref": "Page X, Slide Y, or [MM:SS] timestamp if identifiable"\n'
         "  }\n"
         "]\n"
         "Do not include markdown code fence formatting. Return pure JSON text only."

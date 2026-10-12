@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config import get_gemini_client, DEFAULT_MODEL, CONFIGURED_MODEL, GEMINI_API_KEY
-from extractors import extract_content, SUPPORTED_EXTENSIONS
+from extractors import extract_content, extract_youtube_content, SUPPORTED_EXTENSIONS
 from summarizer import (
     generate_study_summary,
     SUMMARY_STYLES,
@@ -105,6 +105,9 @@ class VisualArtRequest(BaseModel):
 
 class RenameMaterialRequest(BaseModel):
     new_name: str
+
+class YouTubeIngestRequest(BaseModel):
+    url: str
 
 
 # --- Helper ---
@@ -214,6 +217,56 @@ async def upload_material(file: UploadFile = File(...)):
                 os.remove(tmp_path)
             except OSError:
                 pass
+
+@app.post("/api/materials/youtube")
+def ingest_youtube_endpoint(req: YouTubeIngestRequest):
+    """Ingests a YouTube lecture video, extracting timestamped transcripts for grounding."""
+    url = (req.url or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="YouTube URL or video ID is required.")
+
+    try:
+        extracted = extract_youtube_content(url)
+        video_id = extracted["youtube_id"]
+        doc_id = f"yt_{video_id}_{int(time.time())}"
+        size_kb = round(len(extracted["content"]) / 1024, 1)
+
+        item = {
+            "id": doc_id,
+            "name": extracted["title"],
+            "type": "YouTube Lecture",
+            "size_kb": size_kb,
+            "upload_time": datetime.now().strftime("%b %d, %H:%M"),
+            "data": extracted,
+            "status": "Ready",
+            "error": None,
+            "source_url": extracted["video_url"],
+            "metadata": {
+                "thumbnail_url": extracted["thumbnail_url"],
+                "author": extracted["author"],
+                "duration_formatted": extracted["duration_formatted"],
+                "duration_seconds": extracted["duration_seconds"],
+                "youtube_id": extracted["youtube_id"],
+                "segments": extracted["segments"]
+            }
+        }
+        db.save_material(item)
+
+        response_material = {
+            "id": item["id"],
+            "name": item["name"],
+            "type": item["type"],
+            "size_kb": item["size_kb"],
+            "upload_time": item["upload_time"],
+            "status": item["status"],
+            "source_url": item["source_url"],
+            "metadata": item["metadata"]
+        }
+        return {"success": True, "material": response_material}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to ingest YouTube video: {str(e)}")
 
 @app.post("/api/materials/sample")
 def load_sample_material():

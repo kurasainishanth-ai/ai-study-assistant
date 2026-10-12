@@ -916,6 +916,12 @@ header h1 {
   position: relative;
   box-shadow: 0 24px 70px rgba(19, 42, 35, .24);
 }
+.modal.video-modal {
+  width: min(980px, 95vw);
+  max-width: 980px;
+  text-align: left;
+  padding: 24px;
+}
 .close-btn { position: absolute; right: 13px; top: 12px; }
 .modal h2 { font-size: 28px; margin: 14px 0 7px; }
 .modal > p {

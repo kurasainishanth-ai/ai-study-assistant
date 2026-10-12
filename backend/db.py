@@ -29,9 +29,24 @@ def init_db():
                 total_units INTEGER DEFAULT 1,
                 unit_name TEXT DEFAULT 'units',
                 status TEXT NOT NULL,
-                error TEXT
+                error TEXT,
+                source_url TEXT,
+                metadata_json TEXT
             )
         """)
+
+        cursor.execute("PRAGMA table_info(materials)")
+        existing_cols = [row[1] for row in cursor.fetchall()]
+        if "source_url" not in existing_cols:
+            try:
+                cursor.execute("ALTER TABLE materials ADD COLUMN source_url TEXT")
+            except Exception:
+                pass
+        if "metadata_json" not in existing_cols:
+            try:
+                cursor.execute("ALTER TABLE materials ADD COLUMN metadata_json TEXT")
+            except Exception:
+                pass
 
         # 2. Smart Notes
         cursor.execute("""
@@ -149,10 +164,23 @@ def save_material(item: Dict[str, Any]):
     with get_connection() as conn:
         cursor = conn.cursor()
         data = item.get("data") or {}
+        source_url = item.get("source_url") or (data.get("video_url") if isinstance(data, dict) else None)
+        meta_dict = item.get("metadata") or (data.get("metadata") if isinstance(data, dict) else None)
+        if not meta_dict and isinstance(data, dict):
+            meta_dict = {
+                "thumbnail_url": data.get("thumbnail_url"),
+                "author": data.get("author"),
+                "duration_formatted": data.get("duration_formatted"),
+                "duration_seconds": data.get("duration_seconds"),
+                "youtube_id": data.get("youtube_id"),
+                "segments": data.get("segments", [])
+            }
+        meta_json = json.dumps(meta_dict) if meta_dict else None
+
         cursor.execute("""
             INSERT OR REPLACE INTO materials 
-            (id, name, file_type, size_kb, upload_time, content, total_units, unit_name, status, error)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, name, file_type, size_kb, upload_time, content, total_units, unit_name, status, error, source_url, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             item["id"],
             item["name"],
@@ -163,7 +191,9 @@ def save_material(item: Dict[str, Any]):
             data.get("total_units", 1),
             data.get("unit_name", "units"),
             item["status"],
-            item.get("error")
+            item.get("error"),
+            source_url,
+            meta_json
         ))
         conn.commit()
 
@@ -184,6 +214,12 @@ def get_all_materials() -> List[Dict[str, Any]]:
         rows = cursor.fetchall()
         materials = []
         for r in rows:
+            meta = {}
+            if "metadata_json" in r.keys() and r["metadata_json"]:
+                try:
+                    meta = json.loads(r["metadata_json"])
+                except Exception:
+                    pass
             materials.append({
                 "id": r["id"],
                 "name": r["name"],
@@ -194,7 +230,9 @@ def get_all_materials() -> List[Dict[str, Any]]:
                 "error": r["error"],
                 "content": r["content"] or "",
                 "total_units": r["total_units"] or 1,
-                "unit_name": r["unit_name"] or "units"
+                "unit_name": r["unit_name"] or "units",
+                "source_url": r["source_url"] if "source_url" in r.keys() else None,
+                "metadata": meta
             })
         return materials
 
@@ -206,6 +244,12 @@ def get_material(doc_id: str) -> Optional[Dict[str, Any]]:
         r = cursor.fetchone()
         if not r:
             return None
+        meta = {}
+        if "metadata_json" in r.keys() and r["metadata_json"]:
+            try:
+                meta = json.loads(r["metadata_json"])
+            except Exception:
+                pass
         return {
             "id": r["id"],
             "name": r["name"],
@@ -216,7 +260,9 @@ def get_material(doc_id: str) -> Optional[Dict[str, Any]]:
             "error": r["error"],
             "content": r["content"] or "",
             "total_units": r["total_units"] or 1,
-            "unit_name": r["unit_name"] or "units"
+            "unit_name": r["unit_name"] or "units",
+            "source_url": r["source_url"] if "source_url" in r.keys() else None,
+            "metadata": meta
         }
 
 def delete_material(doc_id: str):

@@ -24,6 +24,7 @@ export const api = {
     body.append("file", file);
     return request("/materials/upload", { method: "POST", body });
   },
+  ingestYoutube: (url) => request("/materials/youtube", json({ url })),
   sample: () => request("/materials/sample", { method: "POST" }),
   remove: (id) => request("/materials/" + encodeURIComponent(id), { method: "DELETE" }),
 
