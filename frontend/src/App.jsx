@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  BookOpen, Brain, ChevronLeft, ChevronRight, ChevronDown, FilePlus2, GraduationCap,
+  BookOpen, Brain, ChevronLeft, ChevronRight, ChevronDown, FilePlus2,
   LayoutDashboard, LoaderCircle, MessageCircle, Plus, RefreshCw, Send,
   Sparkles, Trash2, Upload, WandSparkles, X, RotateCcw,
   CheckCircle2, XCircle, Map as MapIcon, Layers, FileText,
@@ -20,6 +20,161 @@ import ForceGraph2D from "react-force-graph-2d";
 /* ------------------------------------------------------------------ */
 
 const text = (v) => (typeof v === "string" ? v : JSON.stringify(v, null, 2));
+
+const getTimeGreeting = (date) => {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  if (hour >= 17 && hour < 22) return "Good evening";
+  return "Good night";
+};
+
+const THEMES = {
+  "Matrix Terminal": { bg: "#0d0d0d", surface: "#161616", fg: "#00ff66", muted: "#74d89a", accent: "#00ff66", border: "rgba(0,255,102,.2)" },
+  "Mocha Dark": { bg: "#1e1e2e", surface: "#181825", fg: "#cdd6f4", muted: "#a6adc8", accent: "#cba6f7", border: "rgba(255,255,255,.1)" },
+  "Tokyo Night": { bg: "#1a1b26", surface: "#24283b", fg: "#a9b1d6", muted: "#929bc5", accent: "#7aa2f7", border: "rgba(122,162,247,.2)" },
+  "Cyberpunk 2077": { bg: "#181528", surface: "#221d38", fg: "#00f0ff", muted: "#b2a9df", accent: "#ffe600", border: "rgba(0,240,255,.25)" },
+  "Serika Dark": { bg: "#323437", surface: "#2c2e31", fg: "#d1d0c5", muted: "#aaa99f", accent: "#e2b714", border: "rgba(226,183,20,.2)" },
+  "8008": { bg: "#333a42", surface: "#2b3138", fg: "#e3e6e8", muted: "#bbc0c4", accent: "#f14e6c", border: "rgba(241,78,108,.2)" },
+  "Botanical": { bg: "#1e2522", surface: "#27322c", fg: "#e1e8e3", muted: "#b5c5bb", accent: "#91b493", border: "rgba(145,180,147,.2)" },
+  "Synthwave '84": { bg: "#262335", surface: "#241b2f", fg: "#36f9f6", muted: "#bbbfe7", accent: "#fe4450", border: "rgba(254,68,80,.25)" },
+  "Horizon Sunset": { bg: "#1c1b22", surface: "#2b2a33", fg: "#fbfbfe", muted: "#c1c0cb", accent: "#ff7162", border: "rgba(255,113,98,.2)" },
+  "Olivia Luxe": { bg: "#1c1b1b", surface: "#262424", fg: "#f2efed", muted: "#c4bcb6", accent: "#deaf9d", border: "rgba(222,175,157,.2)" },
+  "Carbon Minimal": { bg: "#161616", surface: "#262626", fg: "#f4f4f4", muted: "#c0c0c0", accent: "#ffffff", border: "rgba(255,255,255,.15)" },
+  "Paper Light": { bg: "#f7f7f9", surface: "#ffffff", fg: "#1e1e2e", muted: "#6c6f85", accent: "#d20f39", border: "rgba(0,0,0,.1)" },
+  "Spider-Man (Classic Hero Comic)": { bg: "#081426", surface: "#12243D", glass: "rgba(18, 36, 61, 0.78)", fg: "#F7FAFF", muted: "#C7D5E8", accent: "#EF233C", glow: "rgba(239, 35, 60, 0.32)", secondary: "#2563EB", highlight: "#FFD84D", border: "rgba(125, 174, 255, 0.24)" },
+  "Ben 10 (Omnitrix Cyber Alien)": { bg: "#121212", surface: "#0B3818", fg: "#FFFFFF", muted: "#d2d8d3", accent: "#00FF41", secondary: "#0B3818", highlight: "#9E9E9E", border: "rgba(158,158,158,.35)" },
+};
+
+const applyTheme = (name) => {
+  const t = THEMES[name] || THEMES["Matrix Terminal"];
+  const root = document.documentElement;
+  const hex = t.accent.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const channel = (value) => {
+    const normalized = value / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  const accentLuminance = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const contrast = (luminance) => (Math.max(accentLuminance, luminance) + 0.05) / (Math.min(accentLuminance, luminance) + 0.05);
+  const accentText = contrast(0.014) >= contrast(1) ? "#20212a" : "#ffffff";
+  const luminanceOf = (color) => {
+    const values = color.replace("#", "").match(/.{2}/g).map((part) => channel(parseInt(part, 16)));
+    return 0.2126 * values[0] + 0.7152 * values[1] + 0.0722 * values[2];
+  };
+  const backgroundLuminance = luminanceOf(t.bg);
+  const ensureReadable = (color, background, minimum = 4.5) => {
+    const original = color.replace("#", "").match(/.{2}/g).map((part) => parseInt(part, 16));
+    const target = backgroundLuminance > 0.45 ? 0 : 255;
+    for (let step = 0; step <= 100; step += 1) {
+      const amount = step / 100;
+      const candidate = original.map((value) => Math.round(value + (target - value) * amount));
+      const result = `#${candidate.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+      const l = luminanceOf(result);
+      const bg = luminanceOf(background);
+      if ((Math.max(l, bg) + 0.05) / (Math.min(l, bg) + 0.05) >= minimum) return result;
+    }
+    return color;
+  };
+  const readableMuted = ensureReadable(ensureReadable(t.muted, t.bg), t.surface);
+  const dangerReadable = ensureReadable("#ef4444", t.bg);
+  const readableIcon = ensureReadable(t.accent, t.surface, 3);
+  const readableHighlight = ensureReadable(t.highlight || t.accent, t.surface, 3);
+  const vars = {
+    "--bg": t.bg, "--surface": t.surface,
+    "--surface-2": `color-mix(in srgb, ${t.surface} 78%, ${t.fg})`,
+    "--surface-3": `color-mix(in srgb, ${t.surface} 88%, ${t.accent})`,
+    "--glass-bg": t.glass || `color-mix(in srgb, ${t.surface} 78%, transparent)`,
+    "--glass-border": t.border,
+    "--accent-glow": t.glow || `color-mix(in srgb, ${t.accent} 38%, transparent)`,
+    "--border": t.border, "--border-l": t.border,
+    "--fg": t.fg, "--fg-2": readableMuted,
+    "--fg-3": readableMuted,
+    "--fg-muted": readableMuted, "--accent": t.accent, "--accent-fg": accentText,
+    "--danger-readable": dangerReadable, "--icon": readableIcon, "--highlight": readableHighlight,
+    "--green": t.secondary || t.surface, "--green-l": `color-mix(in srgb, ${t.secondary || t.surface} 76%, ${t.accent})`,
+    "--green-fg": t.fg, "--success": "#10b981", "--danger": "#d04735",
+    "--danger-bg": "#f8dfd7", "--danger-fg": "#7d3829", "--purple": t.accent,
+  };
+  Object.entries(vars).forEach(([key, value]) => root.style.setProperty(key, value));
+  root.dataset.theme = name;
+
+  const favicon = document.getElementById("app-favicon");
+  if (favicon) {
+    const iconColor = readableIcon;
+    const sparkColor = readableHighlight;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="${t.bg}"/><g fill="none" stroke="${iconColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M13 25c6-2.7 12.4-1.8 19 2.6V49c-6.6-4.4-13-5.3-19-2.6V25Z"/><path d="M51 25c-6-2.7-12.4-1.8-19 2.6V49c6.6-4.4 13-5.3 19-2.6V25Z"/><path d="M32 27.5V49"/><path d="m46 11 2.1 5.9L54 19l-5.9 2.1L46 27l-2.1-5.9L38 19l5.9-2.1L46 11Z" fill="${sparkColor}" stroke="${sparkColor}" stroke-width="1.5"/></g><circle cx="17" cy="17" r="1.8" fill="${iconColor}"/><circle cx="54" cy="37" r="1.8" fill="${iconColor}"/></svg>`;
+    favicon.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }
+};
+
+function ThemePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event) => {
+      if (!pickerRef.current?.contains(event.target)) setOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
+  return (
+    <div className="theme-picker-wrap" ref={pickerRef}>
+      <button
+        id="theme-picker"
+        type="button"
+        className="theme-picker"
+        aria-label="Select color palette"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
+      >
+        <span className="theme-picker-swatch" aria-hidden="true" />
+        <span className="theme-picker-value">{value}</span>
+        <ChevronDown size={15} className={open ? "theme-picker-chevron is-open" : "theme-picker-chevron"} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="theme-picker-menu" role="listbox" aria-label="Color palettes">
+          {Object.keys(THEMES).map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="option"
+              aria-selected={value === name}
+              className={`theme-picker-option${value === name ? " is-selected" : ""}`}
+              onClick={() => { onChange(name); setOpen(false); }}
+            >
+              <span className="theme-picker-option-dot" aria-hidden="true" />
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudyLaneMark({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <path d="M13 25c6-2.7 12.4-1.8 19 2.6V49c-6.6-4.4-13-5.3-19-2.6V25Z" />
+      <path d="M51 25c-6-2.7-12.4-1.8-19 2.6V49c6.6-4.4 13-5.3 19-2.6V25Z" />
+      <path d="M32 27.5V49" />
+      <path className="emblem-spark" d="m46 11 2.1 5.9L54 19l-5.9 2.1L46 27l-2.1-5.9L38 19l5.9-2.1L46 11Z" />
+      <circle cx="17" cy="17" r="1.5" />
+      <circle cx="54" cy="37" r="1.5" />
+    </svg>
+  );
+}
 
 const extractYoutubeId = (urlOrId) => {
   if (!urlOrId) return null;
@@ -86,7 +241,7 @@ const parseCitationInfo = (citStr) => {
   };
 };
 
-function DynamicCitation({ citation, onClick, isActive }) {
+function DynamicCitation({ citation, onClick, isActive, disabled = false }) {
   const info = parseCitationInfo(citation);
   if (!info) return null;
 
@@ -94,9 +249,10 @@ function DynamicCitation({ citation, onClick, isActive }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       className={`citation-pill ${isTs ? "timestamp-pill" : ""} ${isActive ? "active-target" : ""}`}
       onClick={() => onClick && onClick(info)}
-      title={isTs ? `Jump to video at ${info.label}` : `Jump to ${info.label} in Document Preview`}
+      title={disabled ? "Reference preview is available after submitting the quiz" : isTs ? `Jump to video at ${info.label}` : `Jump to ${info.label} in Document Preview`}
     >
       {isTs ? <Play size={10} fill="#ef4444" /> : <BookOpen size={10} />}
       <span>{info.label || info.raw}</span>
@@ -306,7 +462,7 @@ function FlashcardsRenderer({ data, onReview, onResetMode, onCitationClick }) {
   );
 }
 
-function QuizRenderer({ data, runSubmit, submitting, onResetMode, onCitationClick }) {
+function QuizRenderer({ data, runSubmit, submitting, onResetMode, onCitationClick, citationsEnabled = true }) {
   const [answers, setAnswers] = useState({});
   const [retryMode, setRetryMode] = useState(false);
   
@@ -333,7 +489,7 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode, onCitationClic
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                 <b>{i + 1}. {d.question}</b>
                 {d.source_ref && (
-                  <DynamicCitation citation={d.source_ref} onClick={onCitationClick} />
+                  <DynamicCitation citation={d.source_ref} onClick={onCitationClick} disabled={!citationsEnabled} />
                 )}
               </div>
               <div className="qd-answers">
@@ -386,7 +542,7 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode, onCitationClic
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
             <b>{i + 1}. {q.question}</b>
             {q.source_ref && (
-              <DynamicCitation citation={q.source_ref} onClick={onCitationClick} />
+              <DynamicCitation citation={q.source_ref} onClick={onCitationClick} disabled={!citationsEnabled} />
             )}
           </div>
           {q.options && q.options.length > 0 ? (
@@ -698,6 +854,12 @@ function SourceSelectDropdown({ materials, selectedSourceIds, onToggleSource, on
 
 export default function App() {
   const [view, setView] = useState("home");
+  const [greetingTime, setGreetingTime] = useState(() => new Date());
+  const [themeName, setThemeName] = useState(() =>
+    typeof window !== "undefined" && THEMES[window.localStorage.getItem("studyverse-theme")]
+      ? window.localStorage.getItem("studyverse-theme")
+      : "Matrix Terminal"
+  );
   const [materials, setMaterials] = useState([]);
   const [chats, setChats] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -711,6 +873,16 @@ export default function App() {
   const [progressData, setProgressData] = useState(null);
   const [progressLoading, setProgressLoading] = useState(true);
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setGreetingTime(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    applyTheme(themeName);
+    window.localStorage.setItem("studyverse-theme", themeName);
+  }, [themeName]);
 
   const refresh = useCallback(async () => {
     try {
@@ -750,8 +922,6 @@ export default function App() {
   };
 
   const onDeleteSource = async (id) => {
-    const mat = materials.find((m) => m.id === id);
-    if (mat && !confirm(`Remove '${mat.name}' from your library?`)) return;
     try {
       await api.remove(id);
       setSelectedSourceIds((prev) => prev.filter((x) => x !== id));
@@ -888,13 +1058,16 @@ export default function App() {
   return (
     <div className="shell">
       <aside>
-        <div className="brand"><i><GraduationCap size={20} /></i>studylane</div>
+        <div className="brand"><i><StudyLaneMark className="sidebar-study-mark" /></i>studylane</div>
         <small className="label">YOUR WORKSPACE</small>
         {NAV.map(([id, Icon, label]) => (
           <button key={id} className={`nav${view === id ? " on" : ""}`} onClick={() => handleNavClick(id)}>
             <Icon size={17} />{label}
           </button>
         ))}
+
+        <label className="theme-picker-label" htmlFor="theme-picker">🎨 COLOR PALETTE</label>
+        <ThemePicker value={themeName} onChange={setThemeName} />
         
         <div style={{marginTop: '20px', marginBottom: '10px'}}>
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginBottom: '6px'}}>
@@ -988,9 +1161,11 @@ export default function App() {
         <header>
           <div>
             <small className="label">{view === "home" ? "A CALM PLACE TO LEARN" : view.toUpperCase()}</small>
-            <h1>{view === "home" ? "Good afternoon." : view === "library" ? "Your Library" : view === "studio" ? "Study Studio" : "Your AI Tutor"}</h1>
+            <h1>{view === "home" ? `${getTimeGreeting(greetingTime)}.` : view === "library" ? "Your Library" : view === "studio" ? "Study Studio" : "Your AI Tutor"}</h1>
           </div>
-          <b className="avatar">KS</b>
+          <div className="header-emblem" role="img" aria-label="StudyLane learning emblem" title="StudyLane">
+            <StudyLaneMark />
+          </div>
         </header>
         {notice && <div className="notice">{notice}<button className="btn-icon" onClick={() => setNotice("")}><X size={16} /></button></div>}
         {view === "home" && <Home materials={materials} selected={selected} choose={setSelected} go={setView} upload={() => setShowUpload(true)} progressData={progressData} progressLoading={progressLoading} />}
@@ -1078,7 +1253,7 @@ export default function App() {
 
 function Home({ materials, selected, choose, go, upload, progressData, progressLoading }) {
   return (
-    <section className="page">
+    <section className="page overview-page">
       <div className="hero">
         <div>
           <small className="pill"><Sparkles size={13} /> YOUR PERSONAL LEARNING SPACE</small>
@@ -1089,10 +1264,9 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
             <button className="btn-link" onClick={() => go("studio")}>Open Study Studio <ChevronRight size={17} /></button>
           </div>
         </div>
-        <div className="orb-wrap">
-          <div className="orb" />
-          <span>Ready when you are</span>
-          <b>{materials.length} materials in your lane</b>
+        <div className="overview-side">
+          <OverviewClock />
+          <div className="overview-material-count"><FileText size={15} />{materials.length} {materials.length === 1 ? "material" : "materials"} ready to study</div>
         </div>
       </div>
 
@@ -1105,13 +1279,13 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
             {/* Overall Stats Card */}
-            <div style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <div className="overview-stat-card" style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)' }}>
               <small className="label" style={{ marginBottom: '0.5rem', display: 'block' }}>OVERALL ACTIVITY</small>
               <h3 style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>{progressData.total_quizzes} Quizzes Taken</h3>
               <p style={{ color: 'var(--fg-2)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Average Score: {progressData.average_quiz_score}%</p>
               
               {progressData.recommended_activity && (
-                <div style={{ padding: '1rem', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--accent)' }}>
+                <div className="overview-recommendation" style={{ padding: '1rem', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--accent)' }}>
                   <b style={{ color: 'var(--accent)', fontSize: '0.95rem', display: 'block', marginBottom: '0.25rem' }}>{progressData.recommended_activity.activity}</b>
                   <small style={{ color: 'var(--fg-2)', lineHeight: 1.4, display: 'block' }}>{progressData.recommended_activity.reason}</small>
                 </div>
@@ -1119,7 +1293,7 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
             </div>
             
             {/* Topic Mastery Card */}
-            <div style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
+            <div className="overview-mastery-card" style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
               <small className="label" style={{ marginBottom: '1rem', display: 'block' }}>TOPIC MASTERY</small>
               {Object.keys(progressData.topic_mastery || {}).length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1173,6 +1347,26 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
   );
 }
 
+function OverviewClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="overview-widget clock-widget">
+      <div className="overview-widget-label"><Clock size={15} /> LOCAL TIME</div>
+      <time className="overview-clock-time" dateTime={now.toISOString()}>
+        {new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(now)}
+      </time>
+      <div className="overview-clock-date">
+        {new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" }).format(now)}
+      </div>
+    </div>
+  );
+}
+
 function SectionTitle({ title, action }) {
   return (
     <div className="section">
@@ -1207,7 +1401,6 @@ function EmptyState({ upload }) {
 
 function Library({ materials, selected, choose, refresh, warn, upload, onOpenVideo }) {
   const remove = async (m) => {
-    if (!confirm("Remove '" + m.name + "' and its generated study work?")) return;
     try { await api.remove(m.id); await refresh(); } catch (e) { warn(e.message); }
   };
   return (
@@ -1296,6 +1489,8 @@ function Studio({
   const ToolIcon = tool?.icon;
   const ck = activeDocId && mode ? `${activeDocId}_${mode}` : null;
   const result = ck ? cache[ck] ?? undefined : undefined;
+  const quizSubmitted = mode === "quiz" && Array.isArray(result) && result.length > 0 && result[0]?.score !== undefined;
+  const previewVisible = showPreview && (mode !== "quiz" || quizSubmitted);
 
   /* Auto-restore from DB on first mount for this doc+tool */
   useEffect(() => {
@@ -1389,7 +1584,7 @@ function Studio({
           <ArrowLeft size={16} /> Back
         </button>
       )}
-      <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
+      <Brain size={18} style={{color: 'var(--icon)', flexShrink: 0}} />
       <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>ACTIVE SOURCE MATERIAL</small>
       
       <SourceSelectDropdown
@@ -1400,15 +1595,15 @@ function Studio({
         onDeleteSource={onDeleteSource}
       />
 
-      {mode && activeMaterial && (
+      {mode && activeMaterial && (mode !== "quiz" || quizSubmitted) && (
         <button
-          className={`preview-toggle-btn ${showPreview ? "active" : ""}`}
+          className={`preview-toggle-btn ${previewVisible ? "active" : ""}`}
           onClick={() => setShowPreview(!showPreview)}
           style={{ marginLeft: "auto" }}
-          title={showPreview ? "Hide Reference Preview" : "Show Reference Preview"}
+          title={previewVisible ? "Hide Reference Preview" : "Show Reference Preview"}
         >
-          {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
-          <span>{showPreview ? "Hide Reference Preview" : "Show Reference Preview"}</span>
+          {previewVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+          <span>{previewVisible ? "Hide Reference Preview" : "Show Reference Preview"}</span>
         </button>
       )}
     </div>
@@ -1417,7 +1612,7 @@ function Studio({
   // Render Landing Page
   if (!mode) {
     return (
-      <section className="page studio-landing">
+      <section className="page studio-page studio-landing">
         {renderSourcePicker()}
         <div className="landing-hero" style={{textAlign:'center', padding: '60px 20px'}}>
           <WandSparkles size={48} style={{color:'var(--accent)', marginBottom: 20}} />
@@ -1427,6 +1622,15 @@ function Studio({
               ? `Select a tool below to generate study material from "${activeMaterial.name}".`
               : "Please select or upload a material in your Library first."}
           </p>
+          <div className="studio-marquee" aria-label="Study tools: Smart Notes, Flashcards, Practice Quiz, Knowledge Map">
+            <div className="studio-marquee-track" aria-hidden="true">
+              {[0, 1].map((copy) => (
+                <span className="studio-marquee-set" key={copy}>
+                  <b>✳ SMART NOTES</b><i>✦</i><b>↻ FLASHCARDS</b><i>✦</i><b>✓ PRACTICE QUIZ</b><i>✦</i><b>⌘ KNOWLEDGE MAP</b><i>✦</i>
+                </span>
+              ))}
+            </div>
+          </div>
           <div className="tool-grid" style={{display:'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, maxWidth: 900, margin: '0 auto'}}>
             {TOOLS.map(t => {
               const TIcon = t.icon;
@@ -1436,9 +1640,9 @@ function Studio({
                   className="tool-card"
                   disabled={!activeDocId}
                   onClick={() => setMode(t.id)}
-                  style={{background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-lg)', textAlign: 'left', transition: 'border-color 0.2s, transform 0.1s', cursor: activeDocId ? 'pointer' : 'not-allowed', opacity: activeDocId ? 1 : 0.6}}
+                  style={{background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-lg)', textAlign: 'left', transition: 'border-color 0.2s, transform 0.1s', cursor: activeDocId ? 'pointer' : 'not-allowed'}}
                 >
-                  <TIcon size={24} style={{color: 'var(--green)', marginBottom: 16}} />
+                  <TIcon size={24} strokeWidth={2.2} style={{color: 'var(--icon)', marginBottom: 16}} />
                   <h3 style={{fontSize: 16, margin: '0 0 8px'}}>{t.label}</h3>
                   <p style={{fontSize: 13, color: 'var(--fg-3)', margin: 0, lineHeight: 1.5}}>{t.desc}</p>
                 </button>
@@ -1455,8 +1659,8 @@ function Studio({
 
   // Render specific tool with split preview layout
   return (
-    <section className={`page ${showPreview ? "preview-split-layout full-width" : ""}`}>
-      <div className={showPreview ? "preview-split-main" : ""}>
+    <section className={`page studio-page ${previewVisible ? "preview-split-layout full-width" : ""}`}>
+      <div className={previewVisible ? "preview-split-main" : ""}>
         {renderSourcePicker()}
 
         <div className="studio tool-active-layout" style={{display: 'block', padding: '36px 40px'}}>
@@ -1487,14 +1691,14 @@ function Studio({
               {busy && !hasResult && <div className="loader-block"><LoaderCircle className="spin" size={28} /><p>Generating your study materials…</p></div>}
               {mode === "notes" && <NotesRenderer data={result} onCitationClick={handleCitationClick} />}
               {mode === "cards" && <FlashcardsRenderer data={result} onReview={reviewCard} onResetMode={() => setMode(null)} onCitationClick={handleCitationClick} />}
-              {mode === "quiz" && <QuizRenderer data={result} runSubmit={submitQuiz} submitting={busy} onResetMode={() => setMode(null)} onCitationClick={handleCitationClick} />}
+              {mode === "quiz" && <QuizRenderer data={result} runSubmit={submitQuiz} submitting={busy} onResetMode={() => setMode(null)} onCitationClick={handleCitationClick} citationsEnabled={quizSubmitted} />}
               {mode === "map" && <MapRenderer data={result} />}
             </div>
           </div>
         </div>
       </div>
 
-      {showPreview && activeMaterial && (
+      {previewVisible && activeMaterial && (
         <DocumentPreviewPanel
           material={activeMaterial}
           targetCitation={targetCitation}
@@ -1623,7 +1827,7 @@ function Tutor({
         {/* Active-document indicator & In-Chat Source Picker */}
         <div className="source" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'}}>
           <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth: '240px'}}>
-            <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
+      <Brain size={18} style={{color: 'var(--icon)', flexShrink: 0}} />
             <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
             
             <SourceSelectDropdown
