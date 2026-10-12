@@ -2,6 +2,26 @@ import os
 from PIL import Image
 import io
 
+
+def _needs_ocr(text: str) -> bool:
+    """Heuristic to determine if a page needs OCR due to math/corruption or low text density."""
+    if len(text.strip()) < 50:
+        return True
+    if '�' in text:
+        return True
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    if not lines:
+        return True
+    # PyMuPDF flattens complex math equations into multiple 1-2 character lines.
+    short_lines = sum(1 for l in lines if len(l) <= 3)
+    if len(lines) > 10 and (short_lines / len(lines)) > 0.15:
+        return True
+    # High density of symbols that are often corrupted or present in math
+    suspect_chars = sum(text.count(c) for c in ['^', '~', '\\', '|', '_', '{', '}'])
+    if suspect_chars > 30:
+        return True
+    return False
+
 def extract_pdf_content(file_path: str) -> dict:
     """Extracts text content, handles scanned/handwritten pages via OCR."""
     if not os.path.exists(file_path):
@@ -19,18 +39,22 @@ def extract_pdf_content(file_path: str) -> dict:
         for idx, page in enumerate(doc, start=1):
             text = page.get_text() or ""
             
-            # If the page has very little text (likely scanned or handwritten image)
-            if len(text.strip()) < 50:
-                # Render the page to an image
-                pix = page.get_pixmap(dpi=150)
-                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                
-                # Run OCR
-                ocr_text = ocr_image(img)
-                
-                if ocr_text and "[OCR Failed" not in ocr_text:
-                    extracted_text.append(f"--- [Page {idx} (OCR)] ---\n{ocr_text.strip()}")
-                else:
+            if _needs_ocr(text):
+                try:
+                    # Render the page to an image
+                    pix = page.get_pixmap(dpi=150)
+                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    
+                    # Run OCR
+                    ocr_text = ocr_image(img)
+                    
+                    if ocr_text and "[OCR Failed" not in ocr_text:
+                        extracted_text.append(f"--- [Page {idx} (OCR)] ---\n{ocr_text.strip()}")
+                    else:
+                        if text.strip():
+                            extracted_text.append(f"--- [Page {idx}] ---\n{text.strip()}")
+                except Exception as page_e:
+                    print(f"OCR failed for page {idx}: {page_e}")
                     if text.strip():
                         extracted_text.append(f"--- [Page {idx}] ---\n{text.strip()}")
             else:

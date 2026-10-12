@@ -600,17 +600,22 @@ export default function App() {
   const [showUpload, setShowUpload] = useState(false);
   const [cache, setCache] = useState({});          // keyed "docId_toolId"
   const [activeVideoModal, setActiveVideoModal] = useState(null); // { material, seconds }
+  const [progressData, setProgressData] = useState(null);
+  const [progressLoading, setProgressLoading] = useState(true);
   const fileRef = useRef(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [data, chatsData] = await Promise.all([
+      const [data, chatsData, pData] = await Promise.all([
         api.materials(),
         api.getRecentChats().catch(() => null),
+        api.progress().catch(() => null),
       ]);
       setMaterials(data);
       setSelected((prev) => prev ?? data[0] ?? null);
       if (chatsData) setChats(chatsData);
+      if (pData !== undefined) setProgressData(pData);
+      setProgressLoading(false);
 
       setSelectedSourceIds((prev) => {
         if (!data || data.length === 0) return [];
@@ -880,7 +885,7 @@ export default function App() {
           <b className="avatar">KS</b>
         </header>
         {notice && <div className="notice">{notice}<button className="btn-icon" onClick={() => setNotice("")}><X size={16} /></button></div>}
-        {view === "home" && <Home materials={materials} selected={selected} choose={setSelected} go={setView} upload={() => setShowUpload(true)} />}
+        {view === "home" && <Home materials={materials} selected={selected} choose={setSelected} go={setView} upload={() => setShowUpload(true)} progressData={progressData} progressLoading={progressLoading} />}
         {view === "library" && (
           <Library
             materials={materials}
@@ -905,6 +910,7 @@ export default function App() {
             onToggleSource={onToggleSource}
             onSelectAllSources={onSelectAllSources}
             onDeleteSource={onDeleteSource}
+            refresh={refresh}
           />
         )}
         {view === "tutor" && (
@@ -961,7 +967,7 @@ export default function App() {
 /*  Home                                                               */
 /* ------------------------------------------------------------------ */
 
-function Home({ materials, selected, choose, go, upload }) {
+function Home({ materials, selected, choose, go, upload, progressData, progressLoading }) {
   return (
     <section className="page">
       <div className="hero">
@@ -979,6 +985,69 @@ function Home({ materials, selected, choose, go, upload }) {
           <span>Ready when you are</span>
           <b>{materials.length} materials in your lane</b>
         </div>
+      </div>
+
+      <SectionTitle title="Learning Progress" />
+      <div style={{ marginBottom: "2.5rem" }}>
+        {progressLoading ? (
+          <div className="empty" style={{ minHeight: '120px' }}><LoaderCircle className="spin" /> Loading analytics...</div>
+        ) : !progressData || (!progressData.total_quizzes && Object.keys(progressData.topic_mastery || {}).length === 0) ? (
+          <div className="empty" style={{ minHeight: '120px' }}>No progress data yet. Take a quiz to see your mastery!</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            {/* Overall Stats Card */}
+            <div style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+              <small className="label" style={{ marginBottom: '0.5rem', display: 'block' }}>OVERALL ACTIVITY</small>
+              <h3 style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>{progressData.total_quizzes} Quizzes Taken</h3>
+              <p style={{ color: 'var(--fg-2)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Average Score: {progressData.average_quiz_score}%</p>
+              
+              {progressData.recommended_activity && (
+                <div style={{ padding: '1rem', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--accent)' }}>
+                  <b style={{ color: 'var(--accent)', fontSize: '0.95rem', display: 'block', marginBottom: '0.25rem' }}>{progressData.recommended_activity.activity}</b>
+                  <small style={{ color: 'var(--fg-2)', lineHeight: 1.4, display: 'block' }}>{progressData.recommended_activity.reason}</small>
+                </div>
+              )}
+            </div>
+            
+            {/* Topic Mastery Card */}
+            <div style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
+              <small className="label" style={{ marginBottom: '1rem', display: 'block' }}>TOPIC MASTERY</small>
+              {Object.keys(progressData.topic_mastery || {}).length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {Object.entries(progressData.topic_mastery).map(([topic, data]) => (
+                    <div key={topic} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1, minWidth: '150px' }}>
+                        <strong style={{ display: 'block', fontSize: '0.95rem' }}>{topic}</strong>
+                        <small style={{ color: 'var(--fg-3)' }}>{data.attempts} attempt{data.attempts !== 1 ? 's' : ''}</small>
+                      </div>
+                      <div style={{ flex: 1, padding: '0 1.5rem' }}>
+                        <div style={{ width: '100%', height: '8px', background: 'var(--surface-3)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ 
+                            width: `${data.average_score}%`, 
+                            height: '100%', 
+                            background: data.status === 'Review Recommended' ? 'var(--rating-again)' : data.status === 'Mastered' ? 'var(--rating-know)' : 'var(--accent)', 
+                            transition: 'width 0.3s ease' 
+                          }} />
+                        </div>
+                      </div>
+                      <div style={{ width: '120px', textAlign: 'right' }}>
+                        <span style={{ 
+                          fontSize: '0.85rem', 
+                          fontWeight: 600, 
+                          color: data.status === 'Review Recommended' ? 'var(--rating-again)' : data.status === 'Mastered' ? 'var(--rating-know)' : 'var(--fg-2)' 
+                        }}>
+                          {data.status} ({data.average_score}%)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty" style={{ minHeight: '80px', margin: 0 }}>No topic data available.</div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <SectionTitle title="Recent materials" action={() => go("library")} />
@@ -1100,7 +1169,8 @@ function Studio({
   selectedSourceIds,
   onToggleSource,
   onSelectAllSources,
-  onDeleteSource
+  onDeleteSource,
+  refresh
 }) {
   const [mode, setMode] = useState(null); // Null = Landing Overview
   const [busy, setBusy] = useState(false);
@@ -1181,6 +1251,7 @@ function Studio({
     try {
       const res = await api.submitQuiz(activeDocId, questions, answers);
       setCache((c) => ({ ...c, [ck]: [res] })); // Save attempt as an array to match getQuizAttempts
+      if (refresh) await refresh();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
 
@@ -1756,4 +1827,6 @@ function UploadModal({ busy, close, choose, sample, onIngestYoutube }) {
     </div>
   );
 }
+
+
 
