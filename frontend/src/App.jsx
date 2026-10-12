@@ -4,7 +4,8 @@ import {
   LayoutDashboard, LoaderCircle, MessageCircle, Plus, RefreshCw, Send,
   Sparkles, Trash2, Upload, WandSparkles, X, RotateCcw,
   CheckCircle2, XCircle, Map as MapIcon, Layers, FileText,
-  AlertTriangle, Check, ArrowLeft, Video, Play, ExternalLink, Clock
+  AlertTriangle, Check, ArrowLeft, Video, Play, ExternalLink, Clock,
+  Search, Eye, EyeOff, CornerDownRight
 } from "lucide-react";
 import { api } from "./services/api";
 import ReactMarkdown from "react-markdown";
@@ -38,6 +39,71 @@ const parseTimestampSeconds = (tsStr) => {
   return parseInt(match[1]) * 60 + parseInt(match[2]);
 };
 
+const parseCitationInfo = (citStr) => {
+  if (!citStr) return null;
+  const s = String(citStr).trim();
+  const tsMatch = s.match(/(?:\[)?(\d{1,2}:\d{2}(?::\d{2})?)(?:\])?/);
+  if (tsMatch) {
+    return {
+      type: "timestamp",
+      raw: s,
+      seconds: parseTimestampSeconds(tsMatch[1]),
+      label: tsMatch[1]
+    };
+  }
+  const pageMatch = s.match(/(?:Page|p\.?)\s*(\d+)/i);
+  if (pageMatch) {
+    return {
+      type: "page",
+      raw: s,
+      target: parseInt(pageMatch[1], 10),
+      label: `Page ${pageMatch[1]}`
+    };
+  }
+  const slideMatch = s.match(/(?:Slide|s\.?)\s*(\d+)/i);
+  if (slideMatch) {
+    return {
+      type: "slide",
+      raw: s,
+      target: parseInt(slideMatch[1], 10),
+      label: `Slide ${slideMatch[1]}`
+    };
+  }
+  const secMatch = s.match(/(?:Section|Sec\.?|Part|Paragraph)\s*([0-9A-Za-z.-]+)/i);
+  if (secMatch) {
+    return {
+      type: "section",
+      raw: s,
+      target: secMatch[1],
+      label: `Section ${secMatch[1]}`
+    };
+  }
+  return {
+    type: "general",
+    raw: s,
+    target: s.replace(/^\[|\]$/g, "").trim(),
+    label: s.replace(/^\[|\]$/g, "").trim()
+  };
+};
+
+function DynamicCitation({ citation, onClick, isActive }) {
+  const info = parseCitationInfo(citation);
+  if (!info) return null;
+
+  const isTs = info.type === "timestamp";
+  return (
+    <button
+      type="button"
+      className={`citation-pill ${isTs ? "timestamp-pill" : ""} ${isActive ? "active-target" : ""}`}
+      onClick={() => onClick && onClick(info)}
+      title={isTs ? `Jump to video at ${info.label}` : `Jump to ${info.label} in Document Preview`}
+    >
+      {isTs ? <Play size={10} fill="#ef4444" /> : <BookOpen size={10} />}
+      <span>{info.label || info.raw}</span>
+    </button>
+  );
+}
+
 const Md = ({ children }) => (
   <div className="md-body">
     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
@@ -50,23 +116,47 @@ const Md = ({ children }) => (
 /*  Feature Renderers                                                  */
 /* ------------------------------------------------------------------ */
 
-function NotesRenderer({ data }) {
+function NotesRenderer({ data, onCitationClick }) {
   if (!data) return null;
   const list = Array.isArray(data) ? data : [data];
   if (!list.length || (!list[0]?.content && typeof list[0] !== "string")) return null;
   return (
     <div className="render-notes">
-      {list.map((n, i) => (
-        <article key={i} className="note-card">
-          <h4>{n.style_title || "Study Notes"}</h4>
-          <Md>{typeof n === "string" ? n : n.content}</Md>
-        </article>
-      ))}
+      {list.map((n, i) => {
+        const contentStr = typeof n === "string" ? n : n.content;
+        const citList = Array.from(new Set(
+          contentStr.match(/(?:\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]|\b(?:Page|Slide)\s+\d+\b)/gi) || []
+        ));
+        return (
+          <article key={i} className="note-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+              <h4 style={{ margin: 0 }}>{n.style_title || "Study Notes"}</h4>
+              {citList.length > 0 && onCitationClick && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end" }}>
+                  <small style={{ fontSize: 11, color: "var(--fg-3)", fontWeight: 600 }}>Citations:</small>
+                  {citList.slice(0, 6).map((cit, ci) => (
+                    <DynamicCitation key={ci} citation={cit} onClick={onCitationClick} />
+                  ))}
+                </div>
+              )}
+            </div>
+            <Md>{contentStr}</Md>
+            {citList.length > 0 && onCitationClick && (
+              <div style={{ marginTop: 18, paddingTop: 12, borderTop: "1px dashed var(--border)", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                <small style={{ fontSize: 11, color: "var(--fg-3)", fontWeight: 600 }}>All Referenced Sources:</small>
+                {citList.map((cit, ci) => (
+                  <DynamicCitation key={ci} citation={cit} onClick={onCitationClick} />
+                ))}
+              </div>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }
 
-function FlashcardsRenderer({ data, onReview, onResetMode }) {
+function FlashcardsRenderer({ data, onReview, onResetMode, onCitationClick }) {
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
@@ -177,7 +267,14 @@ function FlashcardsRenderer({ data, onReview, onResetMode }) {
       <div className={`flip-card${flipped ? " flipped" : ""}`} onClick={() => setFlipped(!flipped)}>
         <div className="flip-inner">
           <div className="flip-front"><Md>{c.question || c.front || ""}</Md></div>
-          <div className="flip-back"><Md>{c.answer || c.back || ""}</Md></div>
+          <div className="flip-back">
+            <Md>{c.answer || c.back || ""}</Md>
+            {c.source_ref && (
+              <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
+                <DynamicCitation citation={c.source_ref} onClick={onCitationClick} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>Click card to flip</p>
@@ -209,7 +306,7 @@ function FlashcardsRenderer({ data, onReview, onResetMode }) {
   );
 }
 
-function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
+function QuizRenderer({ data, runSubmit, submitting, onResetMode, onCitationClick }) {
   const [answers, setAnswers] = useState({});
   const [retryMode, setRetryMode] = useState(false);
   
@@ -233,7 +330,12 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
         <div className="quiz-details-list">
           {a.evaluations?.map((d, i) => (
             <div key={i} className={`quiz-detail ${d.is_correct ? "correct" : "wrong"}`}>
-              <b>{i + 1}. {d.question}</b>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                <b>{i + 1}. {d.question}</b>
+                {d.source_ref && (
+                  <DynamicCitation citation={d.source_ref} onClick={onCitationClick} />
+                )}
+              </div>
               <div className="qd-answers">
                 <p className="muted">Your answer: {d.student_answer}</p>
                 {!d.is_correct && <p className="correct-answer">Answer Key: {d.correct_answer}</p>}
@@ -268,7 +370,8 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
     qs = data[0].evaluations.map(ev => ({
       id: ev.id,
       question: ev.question,
-      options: ev.options || null // If options got lost, it'll fallback to descriptive
+      options: ev.options || null,
+      source_ref: ev.source_ref || null
     }));
   } else {
     qs = data?.questions || (Array.isArray(data) ? data : []);
@@ -280,7 +383,12 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
     <div className="render-quiz">
       {qs.map((q, i) => (
         <div key={i} className="quiz-q">
-          <b>{i + 1}. {q.question}</b>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+            <b>{i + 1}. {q.question}</b>
+            {q.source_ref && (
+              <DynamicCitation citation={q.source_ref} onClick={onCitationClick} />
+            )}
+          </div>
           {q.options && q.options.length > 0 ? (
             <div className="quiz-options">
               {q.options.map((opt, j) => (
@@ -911,6 +1019,7 @@ export default function App() {
             onSelectAllSources={onSelectAllSources}
             onDeleteSource={onDeleteSource}
             refresh={refresh}
+            onOpenVideo={(mat, secs) => setActiveVideoModal({ material: mat, seconds: secs || 0 })}
           />
         )}
         {view === "tutor" && (
@@ -923,7 +1032,7 @@ export default function App() {
             onToggleSource={onToggleSource}
             onSelectAllSources={onSelectAllSources}
             onDeleteSource={onDeleteSource}
-            onCitationClick={handleCitationClick}
+            onOpenVideo={(mat, secs) => setActiveVideoModal({ material: mat, seconds: secs || 0 })}
           />
         )}
       </main>
@@ -1170,12 +1279,15 @@ function Studio({
   onToggleSource,
   onSelectAllSources,
   onDeleteSource,
-  refresh
+  refresh,
+  onOpenVideo
 }) {
   const [mode, setMode] = useState(null); // Null = Landing Overview
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
+  const [showPreview, setShowPreview] = useState(true);
+  const [targetCitation, setTargetCitation] = useState(null);
 
   const activeDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
   const activeMaterial = (materials || []).find((m) => m.id === activeDocId) || (!selected?.is_chat ? selected : null);
@@ -1231,6 +1343,19 @@ function Studio({
     if (confirm("Regenerate? This replaces the current result.")) generate();
   };
 
+  const handleCitationClick = (citationObj) => {
+    const cit = typeof citationObj === "string" ? parseCitationInfo(citationObj) : citationObj;
+    if (!cit) return;
+    if (cit.type === "timestamp") {
+      if (onOpenVideo && activeMaterial) {
+        onOpenVideo(activeMaterial, cit.seconds);
+      }
+    } else {
+      setShowPreview(true);
+      setTargetCitation(cit);
+    }
+  };
+
   const reviewCard = async (cardId, rating) => {
     try { 
       await api.reviewCard(cardId, rating); 
@@ -1274,6 +1399,18 @@ function Studio({
         onSelectAll={onSelectAllSources}
         onDeleteSource={onDeleteSource}
       />
+
+      {mode && activeMaterial && (
+        <button
+          className={`preview-toggle-btn ${showPreview ? "active" : ""}`}
+          onClick={() => setShowPreview(!showPreview)}
+          style={{ marginLeft: "auto" }}
+          title={showPreview ? "Hide Reference Preview" : "Show Reference Preview"}
+        >
+          {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+          <span>{showPreview ? "Hide Reference Preview" : "Show Reference Preview"}</span>
+        </button>
+      )}
     </div>
   );
 
@@ -1316,44 +1453,55 @@ function Studio({
     );
   }
 
-  // Render specific tool
+  // Render specific tool with split preview layout
   return (
-    <section className="page">
-      {renderSourcePicker()}
+    <section className={`page ${showPreview ? "preview-split-layout full-width" : ""}`}>
+      <div className={showPreview ? "preview-split-main" : ""}>
+        {renderSourcePicker()}
 
-      <div className="studio tool-active-layout" style={{display: 'block', padding: '40px 60px'}}>
-        <div className="work" style={{maxWidth: '100%', padding: 0}}>
-          <div style={{display:'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-            <div>
-              <small className="label" style={{margin: '0 0 10px'}}>STUDY STUDIO</small>
-              <h2 style={{margin: 0, display:'flex', alignItems:'center', gap: 10}}><ToolIcon size={28} />{tool.label}</h2>
-              <p>{tool.desc}</p>
+        <div className="studio tool-active-layout" style={{display: 'block', padding: '36px 40px'}}>
+          <div className="work" style={{maxWidth: '100%', padding: 0}}>
+            <div style={{display:'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+              <div>
+                <small className="label" style={{margin: '0 0 10px'}}>STUDY STUDIO</small>
+                <h2 style={{margin: 0, display:'flex', alignItems:'center', gap: 10}}><ToolIcon size={28} />{tool.label}</h2>
+                <p>{tool.desc}</p>
+              </div>
+              <div className="work-actions">
+                {!hasResult && (
+                  <button className="btn-primary" disabled={!activeDocId || busy} onClick={generate}>
+                    {busy ? <><LoaderCircle className="spin" size={16} /> Generating…</> : <><WandSparkles size={16} /> Create {tool.label.toLowerCase()}</>}
+                  </button>
+                )}
+                {hasResult && (
+                  <button className="btn-secondary" disabled={busy} onClick={regenerate}>
+                    {busy ? <><LoaderCircle className="spin" size={15} /> Regenerating…</> : <><RefreshCw size={15} /> Regenerate</>}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="work-actions">
-              {!hasResult && (
-                <button className="btn-primary" disabled={!activeDocId || busy} onClick={generate}>
-                  {busy ? <><LoaderCircle className="spin" size={16} /> Generating…</> : <><WandSparkles size={16} /> Create {tool.label.toLowerCase()}</>}
-                </button>
-              )}
-              {hasResult && (
-                <button className="btn-secondary" disabled={busy} onClick={regenerate}>
-                  {busy ? <><LoaderCircle className="spin" size={15} /> Regenerating…</> : <><RefreshCw size={15} /> Regenerate</>}
-                </button>
-              )}
+
+            {error && <div className="error-box"><XCircle size={15} /> {error}</div>}
+
+            <div className="render-area" style={{marginTop: 30}}>
+              {busy && !hasResult && <div className="loader-block"><LoaderCircle className="spin" size={28} /><p>Generating your study materials…</p></div>}
+              {mode === "notes" && <NotesRenderer data={result} onCitationClick={handleCitationClick} />}
+              {mode === "cards" && <FlashcardsRenderer data={result} onReview={reviewCard} onResetMode={() => setMode(null)} onCitationClick={handleCitationClick} />}
+              {mode === "quiz" && <QuizRenderer data={result} runSubmit={submitQuiz} submitting={busy} onResetMode={() => setMode(null)} onCitationClick={handleCitationClick} />}
+              {mode === "map" && <MapRenderer data={result} />}
             </div>
-          </div>
-
-          {error && <div className="error-box"><XCircle size={15} /> {error}</div>}
-
-          <div className="render-area" style={{marginTop: 30}}>
-            {busy && !hasResult && <div className="loader-block"><LoaderCircle className="spin" size={28} /><p>Generating your study materials…</p></div>}
-            {mode === "notes" && <NotesRenderer data={result} />}
-            {mode === "cards" && <FlashcardsRenderer data={result} onReview={reviewCard} onResetMode={() => setMode(null)} />}
-            {mode === "quiz" && <QuizRenderer data={result} runSubmit={submitQuiz} submitting={busy} onResetMode={() => setMode(null)} />}
-            {mode === "map" && <MapRenderer data={result} />}
           </div>
         </div>
       </div>
+
+      {showPreview && activeMaterial && (
+        <DocumentPreviewPanel
+          material={activeMaterial}
+          targetCitation={targetCitation}
+          onClose={() => setShowPreview(false)}
+          onOpenVideo={onOpenVideo}
+        />
+      )}
     </section>
   );
 }
@@ -1371,13 +1519,18 @@ function Tutor({
   onToggleSource,
   onSelectAllSources,
   onDeleteSource,
-  onCitationClick
+  onOpenVideo
 }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
+  const [targetCitation, setTargetCitation] = useState(null);
   const scrollRef = useRef(null);
+
+  const activeDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
+  const activeMaterial = (materials || []).find((m) => m.id === activeDocId) || (!selected?.is_chat ? selected : null);
 
   useEffect(() => {
     let live = true;
@@ -1401,6 +1554,23 @@ function Tutor({
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  const handleCitationClick = (citationObj) => {
+    const cit = typeof citationObj === "string" ? parseCitationInfo(citationObj) : citationObj;
+    if (!cit) return;
+    if (cit.type === "timestamp") {
+      let targetMat = activeMaterial;
+      if (!targetMat || (!targetMat.metadata?.youtube_id && !targetMat.source_url)) {
+        targetMat = materials.find((m) => m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url);
+      }
+      if (onOpenVideo && targetMat) {
+        onOpenVideo(targetMat, cit.seconds);
+      }
+    } else {
+      setShowPreview(true);
+      setTargetCitation(cit);
+    }
+  };
 
   const clearChat = async () => {
     if (messages.length === 0) return;
@@ -1437,7 +1607,7 @@ function Tutor({
       const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
       const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId);
       const answerText = r.response || r.answer || r.content || text(r);
-      const citList = (r.citations && r.citations.length) ? r.citations : Array.from(new Set(answerText.match(/\[(?:(?:Page|Slide|Section)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || []));
+      const citList = (r.citations && r.citations.length) ? r.citations : Array.from(new Set(answerText.match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || []));
       setMessages((x) => [...x, ["Study tutor", answerText, "", citList]]);
       if (refreshChats) refreshChats();
     } catch (err) {
@@ -1448,88 +1618,506 @@ function Tutor({
   };
 
   return (
-    <section className="page tutor-page">
-      {/* Active-document indicator & In-Chat Source Picker */}
-      <div className="source" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'}}>
-        <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth: '240px'}}>
-          <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
-          <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
-          
-          <SourceSelectDropdown
-            materials={materials}
-            selectedSourceIds={selectedSourceIds}
-            onToggleSource={onToggleSource}
-            onSelectAll={onSelectAllSources}
-            onDeleteSource={onDeleteSource}
-          />
+    <section className={`page tutor-page ${showPreview ? "preview-split-layout full-width" : ""}`}>
+      <div className={showPreview ? "preview-split-main" : ""}>
+        {/* Active-document indicator & In-Chat Source Picker */}
+        <div className="source" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'}}>
+          <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth: '240px'}}>
+            <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
+            <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
+            
+            <SourceSelectDropdown
+              materials={materials}
+              selectedSourceIds={selectedSourceIds}
+              onToggleSource={onToggleSource}
+              onSelectAll={onSelectAllSources}
+              onDeleteSource={onDeleteSource}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+            {activeMaterial && (
+              <button
+                className={`preview-toggle-btn ${showPreview ? "active" : ""}`}
+                onClick={() => setShowPreview(!showPreview)}
+                title={showPreview ? "Hide Reference Preview" : "Show Reference Preview"}
+              >
+                {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span>{showPreview ? "Hide Reference Preview" : "Show Reference Preview"}</span>
+              </button>
+            )}
+
+            {messages.length > 0 && (
+              <button className="btn-ghost" disabled={busy || clearing} onClick={clearChat}>
+                <Trash2 size={16} /> Clear Chat
+              </button>
+            )}
+          </div>
         </div>
 
-        {messages.length > 0 && (
-          <button className="btn-ghost" disabled={busy || clearing} onClick={clearChat} style={{marginLeft:'auto'}}>
-            <Trash2 size={16} /> Clear Chat
-          </button>
-        )}
+        {/* Chat area */}
+        <div className="chat-container" ref={scrollRef}>
+          {messages.length ? messages.map((m, i) => {
+            const citList = Array.isArray(m[3]) && m[3].length ? m[3] : (m[2] !== "you" ? Array.from(new Set(String(m[1]).match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || [])) : []);
+            return (
+              <div key={i} className={`msg ${m[2]}`}>
+                <small>{m[0]}</small>
+                <div className="msg-body">
+                  <Md>{m[1]}</Md>
+                  {citList.length > 0 && m[2] !== "you" && (
+                    <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <small style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600 }}>Sources:</small>
+                      {citList.map((cit, ci) => (
+                        <DynamicCitation
+                          key={ci}
+                          citation={cit}
+                          onClick={handleCitationClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="chat-empty">
+              <MessageCircle size={32} />
+              <h2>What are you working through?</h2>
+              <p>Ask for an explanation, a memory trick, or a step-by-step walkthrough.</p>
+            </div>
+          )}
+          {busy && <div className="msg"><small>Study tutor</small><p className="typing"><LoaderCircle className="spin" size={14} /> Thinking…</p></div>}
+        </div>
+
+        <form className="chat-input" onSubmit={submit}>
+          <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your AI Tutor anything..." />
+          <button className="btn-send" disabled={busy || !input.trim()} type="submit"><Send size={18} /></button>
+        </form>
       </div>
 
-      {/* Chat area */}
-      <div className="chat-container" ref={scrollRef}>
-        {messages.length ? messages.map((m, i) => {
-          const citList = Array.isArray(m[3]) && m[3].length ? m[3] : (m[2] !== "you" ? Array.from(new Set(String(m[1]).match(/\[(?:(?:Page|Slide|Section)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || [])) : []);
-          return (
-            <div key={i} className={`msg ${m[2]}`}>
-              <small>{m[0]}</small>
-              <div className="msg-body">
-                <Md>{m[1]}</Md>
-                {citList.length > 0 && m[2] !== "you" && (
-                  <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <small style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600 }}>Sources:</small>
-                    {citList.map((cit, ci) => {
-                      const isTimestamp = /\d{1,2}:\d{2}/.test(cit);
-                      return (
-                        <button
-                          key={ci}
-                          type="button"
-                          onClick={() => onCitationClick && onCitationClick(cit)}
-                          style={{
-                            padding: '3px 9px',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            borderRadius: 12,
-                            border: '1px solid ' + (isTimestamp ? 'rgba(239,68,68,0.35)' : 'var(--border)'),
-                            background: isTimestamp ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.06)',
-                            color: isTimestamp ? '#ef4444' : 'var(--primary, #10b981)',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4
-                          }}
-                          title={isTimestamp ? "Click to jump video to timestamp" : "Source citation"}
-                        >
-                          {isTimestamp && <Play size={10} fill="#ef4444" />}
-                          {cit}
-                        </button>
-                      );
-                    })}
+      {showPreview && activeMaterial && (
+        <DocumentPreviewPanel
+          material={activeMaterial}
+          targetCitation={targetCitation}
+          onClose={() => setShowPreview(false)}
+          onOpenVideo={onOpenVideo}
+        />
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document Preview Panel (Right Side for Studio & AI Tutor)         */
+/* ------------------------------------------------------------------ */
+
+function DocumentPreviewPanel({
+  material,
+  targetCitation,
+  onClose,
+  onOpenVideo
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [videoSeek, setVideoSeek] = useState(0);
+  const [viewMode, setViewMode] = useState("auto"); // "auto", "native", "text"
+  const [pdfAvailable, setPdfAvailable] = useState(true);
+  const [reuploadLoading, setReuploadLoading] = useState(false);
+  const [reuploadError, setReuploadError] = useState("");
+  const reuploadRef = useRef(null);
+  const contentRef = useRef(null);
+
+  const isPDF = material?.name?.toLowerCase().endsWith(".pdf") || material?.type === "PDF Document";
+  const youtubeId = material?.metadata?.youtube_id || extractYoutubeId(material?.source_url) || extractYoutubeId(material?.id);
+  const isYouTube = material?.type === "YouTube Lecture" || !!youtubeId;
+  const rawFileUrl = material?.id ? api.materialFileUrl(material.id) : null;
+
+  // Check if original PDF file exists on server
+  useEffect(() => {
+    if (material?.id && isPDF) {
+      fetch(api.materialFileUrl(material.id), { method: "HEAD" })
+        .then((res) => {
+          setPdfAvailable(res.ok);
+        })
+        .catch(() => {
+          setPdfAvailable(false);
+        });
+    }
+  }, [material?.id, isPDF]);
+
+  // Track target citation changes
+  useEffect(() => {
+    if (!targetCitation) return;
+    if (targetCitation.type === "timestamp" && isYouTube) {
+      setVideoSeek(targetCitation.seconds || 0);
+    }
+  }, [targetCitation, isYouTube]);
+
+  // Parse sections/units/pages from content for text fallback and search
+  const sections = [];
+  if (material?.content) {
+    const raw = material.content;
+    const parts = raw.split(/(?=---\s*\[(?:Page|Slide|Part|Section)\s*\d+[^\]]*\]\s*---)/gi);
+    if (parts.length > 1) {
+      parts.forEach((p, idx) => {
+        const trimmed = p.trim();
+        if (!trimmed) return;
+        const headerMatch = trimmed.match(/^---\s*\[((?:Page|Slide|Part|Section)\s*\d+[^\]]*)\]\s*---\s*/i);
+        if (headerMatch) {
+          sections.push({
+            id: `sec-${idx}`,
+            label: headerMatch[1],
+            text: trimmed.replace(/^---\s*\[(?:Page|Slide|Part|Section)\s*\d+[^\]]*\]\s*---\s*/i, "").trim()
+          });
+        } else {
+          sections.push({
+            id: `sec-${idx}`,
+            label: `Section ${idx + 1}`,
+            text: trimmed
+          });
+        }
+      });
+    } else {
+      // Split by paragraphs
+      const paras = raw.split(/\n\s*\n/);
+      paras.forEach((p, idx) => {
+        const trimmed = p.trim();
+        if (trimmed) {
+          sections.push({
+            id: `para-${idx + 1}`,
+            label: `Paragraph ${idx + 1}`,
+            text: trimmed
+          });
+        }
+      });
+    }
+  }
+
+  // Auto-scroll to citation target when in text mode
+  useEffect(() => {
+    if (!targetCitation) return;
+    const timeout = setTimeout(() => {
+      let el = null;
+      if (targetCitation.type === "page" || targetCitation.type === "slide") {
+        const idRegex = new RegExp(`(?:Page|Slide)\\s*${targetCitation.target}`, "i");
+        el = Array.from(contentRef.current?.querySelectorAll(".preview-section-card") || []).find((card) =>
+          idRegex.test(card.getAttribute("data-label") || "")
+        );
+      } else if (targetCitation.type === "section") {
+        el = Array.from(contentRef.current?.querySelectorAll(".preview-section-card") || []).find((card) =>
+          String(card.getAttribute("data-label") || "").toLowerCase().includes(String(targetCitation.target).toLowerCase())
+        );
+      }
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [targetCitation, viewMode]);
+
+  const filteredSections = sections.filter((s) => {
+    if (!searchTerm) return true;
+    const st = searchTerm.toLowerCase();
+    return s.label.toLowerCase().includes(st) || s.text.toLowerCase().includes(st);
+  });
+
+  // Calculate PDF iframe target with page anchor
+  let pdfPageParam = "";
+  if (targetCitation && (targetCitation.type === "page" || targetCitation.type === "slide")) {
+    pdfPageParam = `#page=${targetCitation.target}`;
+  }
+
+  const effectiveView = viewMode === "auto" ? (isPDF ? "native" : isYouTube ? "video" : "text") : viewMode;
+
+  return (
+    <aside className="preview-split-panel" aria-label="Reference Document Preview">
+      <div className="preview-panel-header">
+        <div className="preview-panel-title">
+          {isYouTube ? (
+            <Video size={17} style={{ color: "#ef4444", flexShrink: 0 }} />
+          ) : isPDF ? (
+            <BookOpen size={17} style={{ color: "var(--green)", flexShrink: 0 }} />
+          ) : (
+            <FileText size={17} style={{ color: "var(--green)", flexShrink: 0 }} />
+          )}
+          <span title={material?.name || "Study Material"}>
+            {material?.name || "No material loaded"}
+          </span>
+          <small>{material?.unit_name ? `${material.total_units || 1} ${material.unit_name}` : material?.type || "Document"}</small>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* View Mode Switcher if document is PDF */}
+          {isPDF && (
+            <div style={{ display: "flex", background: "var(--surface-3)", borderRadius: 6, padding: 2 }}>
+              <button
+                className={`btn-ghost ${effectiveView === "native" ? "active" : ""}`}
+                style={{ padding: "2px 7px", fontSize: 10, fontWeight: 700, borderRadius: 4, background: effectiveView === "native" ? "#fff" : "transparent" }}
+                onClick={() => setViewMode("native")}
+                title="View original PDF document"
+              >
+                PDF
+              </button>
+              <button
+                className={`btn-ghost ${effectiveView === "text" ? "active" : ""}`}
+                style={{ padding: "2px 7px", fontSize: 10, fontWeight: 700, borderRadius: 4, background: effectiveView === "text" ? "#fff" : "transparent" }}
+                onClick={() => setViewMode("text")}
+                title="View parsed text & sections"
+              >
+                Text
+              </button>
+            </div>
+          )}
+
+          {isYouTube && onOpenVideo && (
+            <button
+              className="preview-toggle-btn"
+              style={{ padding: "3px 7px", fontSize: 11, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)" }}
+              onClick={() => onOpenVideo(material, videoSeek)}
+              title="Pop out video player modal"
+            >
+              <ExternalLink size={12} /> Expand
+            </button>
+          )}
+
+          <button className="btn-icon" onClick={onClose} title="Close Preview Panel">
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* Target Citation Banner */}
+      {targetCitation && (
+        <div style={{ padding: "8px 16px", background: "#fef3c7", borderBottom: "1px solid #fde68a", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#92400e", fontWeight: 600 }}>
+            <CornerDownRight size={13} /> {targetCitation.type === "timestamp" ? `Playing at ${targetCitation.label}` : `Navigated to ${targetCitation.label}`}
+          </span>
+          {targetCitation.type === "timestamp" && isYouTube && (
+            <span style={{ color: "#b45309", fontSize: 11, fontWeight: 700 }}>
+              Live in Player
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* 1. Native Video Player in Preview Panel */}
+      {effectiveView === "video" && isYouTube && (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, background: "#000", flexShrink: 0 }}>
+            {youtubeId ? (
+              <iframe
+                key={videoSeek}
+                src={`https://www.youtube.com/embed/${youtubeId}?start=${videoSeek}&autoplay=1`}
+                title={material?.name || "YouTube Lecture"}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#fff" }}>
+                Video unavailable
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <small style={{ fontWeight: 700, color: "var(--fg-3)" }}>TIMESTAMPED TRANSCRIPT</small>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Search size={12} style={{ color: "var(--fg-3)" }} />
+              <input
+                type="text"
+                placeholder="Filter transcript..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ border: "1px solid var(--border)", borderRadius: 4, padding: "2px 6px", fontSize: 11 }}
+              />
+            </div>
+          </div>
+
+          <div className="preview-panel-body" style={{ flex: 1, padding: 12 }}>
+            {sections.filter(s => !searchTerm || s.text.toLowerCase().includes(searchTerm.toLowerCase())).map((sec, idx) => {
+              const tsMatch = sec.label.match(/\d{1,2}:\d{2}/) || sec.text.match(/\[(\d{1,2}:\d{2})\]/);
+              const tsSecs = tsMatch ? parseTimestampSeconds(tsMatch[1] || tsMatch[0]) : 0;
+              const isCurrent = targetCitation?.type === "timestamp" && Math.abs(targetCitation.seconds - tsSecs) < 15;
+
+              return (
+                <div
+                  key={idx}
+                  className={`preview-section-card ${isCurrent ? "highlighted" : ""}`}
+                  style={{ padding: "8px 12px", marginBottom: 8, cursor: "pointer" }}
+                  onClick={() => {
+                    setVideoSeek(tsSecs);
+                  }}
+                  title="Click to jump video to this timestamp"
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span className="preview-section-badge yt-badge">
+                      <Play size={10} fill="#dc2626" /> {tsMatch ? (tsMatch[1] || tsMatch[0]) : sec.label}
+                    </span>
+                    {isCurrent && <span className="preview-badge-cit">Active</span>}
                   </div>
-                )}
+                  <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--fg)" }}>
+                    {sec.text.replace(/^\[\d{1,2}:\d{2}\]\s*/, "")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 2. Original Form PDF View directly in Preview Panel */}
+      {effectiveView === "native" && isPDF && (
+        <div style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
+          {pdfAvailable && rawFileUrl ? (
+            <object
+              key={`${material.id}_${pdfPageParam}`}
+              data={`${rawFileUrl}${pdfPageParam}`}
+              type="application/pdf"
+              style={{ width: "100%", height: "100%", border: 0, flex: 1 }}
+            >
+              <iframe
+                src={`${rawFileUrl}${pdfPageParam}`}
+                title={material.name}
+                style={{ width: "100%", height: "100%", border: 0, flex: 1 }}
+              />
+            </object>
+          ) : (
+            /* ── Re-upload prompt for older materials that lack a saved binary ── */
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              height: "100%", gap: 16, padding: 24, textAlign: "center"
+            }}>
+              {/* Hidden file input */}
+              <input
+                ref={reuploadRef}
+                type="file"
+                accept=".pdf"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f || !material?.id) return;
+                  setReuploadLoading(true);
+                  setReuploadError("");
+                  try {
+                    await api.reuploadMaterial(material.id, f);
+                    setPdfAvailable(true);
+                  } catch (err) {
+                    setReuploadError(err.message || "Upload failed. Please try again.");
+                  } finally {
+                    setReuploadLoading(false);
+                    // Reset the input so the same file can be re-selected if needed
+                    if (reuploadRef.current) reuploadRef.current.value = "";
+                  }
+                }}
+              />
+              <div style={{
+                width: 64, height: 64, borderRadius: "50%",
+                background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+                <FileText size={28} style={{ color: "var(--fg-3)" }} />
+              </div>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Native preview unavailable</p>
+                <p style={{ fontSize: 13, color: "var(--fg-3)", lineHeight: 1.6, maxWidth: 260 }}>
+                  This file was uploaded before native preview was enabled. Re-upload the same PDF to view it inline here — your notes and progress are kept.
+                </p>
+              </div>
+              {reuploadError && (
+                <p style={{ fontSize: 12, color: "var(--red, #ef4444)", margin: 0 }}>{reuploadError}</p>
+              )}
+              <div style={{ display: "flex", gap: 8, flexDirection: "column", width: "100%", maxWidth: 240 }}>
+                <button
+                  className="btn-primary"
+                  style={{ width: "100%", justifyContent: "center", gap: 6 }}
+                  disabled={reuploadLoading}
+                  onClick={() => reuploadRef.current?.click()}
+                >
+                  {reuploadLoading ? (
+                    <><Loader2 size={14} className="spin" /> Uploading…</>
+                  ) : (
+                    <><Upload size={14} /> Re-upload PDF</>
+                  )}
+                </button>
+                <button
+                  className="btn-ghost"
+                  style={{ width: "100%", justifyContent: "center", fontSize: 12, color: "var(--fg-3)" }}
+                  onClick={() => setViewMode("text")}
+                >
+                  View extracted text instead
+                </button>
               </div>
             </div>
-          );
-        }) : (
-          <div className="chat-empty">
-            <MessageCircle size={32} />
-            <h2>What are you working through?</h2>
-            <p>Ask for an explanation, a memory trick, or a step-by-step walkthrough.</p>
-          </div>
-        )}
-        {busy && <div className="msg"><small>Study tutor</small><p className="typing"><LoaderCircle className="spin" size={14} /> Thinking…</p></div>}
-      </div>
+          )}
+        </div>
+      )}
 
-      <form className="chat-input" onSubmit={submit}>
-        <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your AI Tutor anything..." />
-        <button className="btn-send" disabled={busy || !input.trim()} type="submit"><Send size={18} /></button>
-      </form>
-    </section>
+      {/* 3. Parsed Text / Sections View */}
+      {effectiveView === "text" && (
+        <>
+          <div className="preview-panel-search">
+            <Search size={14} style={{ color: "var(--fg-3)" }} />
+            <input
+              type="text"
+              placeholder="Search in reference material..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button className="btn-icon" style={{ padding: 2 }} onClick={() => setSearchTerm("")}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          <div className="preview-panel-body" ref={contentRef}>
+            {!material ? (
+              <p className="muted" style={{ textAlign: "center", marginTop: 40 }}>No reference material selected.</p>
+            ) : filteredSections.length > 0 ? (
+              filteredSections.map((sec) => {
+                let isTarget = false;
+                if (targetCitation) {
+                  if (targetCitation.type === "page" || targetCitation.type === "slide") {
+                    const pat = new RegExp(`(?:Page|Slide)\\s*${targetCitation.target}`, "i");
+                    isTarget = pat.test(sec.label);
+                  } else if (targetCitation.type === "section") {
+                    isTarget = sec.label.toLowerCase().includes(String(targetCitation.target).toLowerCase());
+                  }
+                }
+
+                return (
+                  <div
+                    key={sec.id}
+                    className={`preview-section-card ${isTarget ? "highlighted" : ""}`}
+                    data-label={sec.label}
+                  >
+                    <div className="preview-section-header">
+                      <span className="preview-section-badge">{sec.label}</span>
+                      {isTarget && (
+                        <span className="preview-badge-cit">
+                          <Sparkles size={11} /> Cited Section
+                        </span>
+                      )}
+                    </div>
+                    <div className="preview-section-content">
+                      {sec.text}
+                    </div>
+                  </div>
+                );
+              })
+            ) : material.content ? (
+              <div className="preview-section-card">
+                <div className="preview-section-content" style={{ whiteSpace: "pre-wrap" }}>
+                  {material.content}
+                </div>
+              </div>
+            ) : (
+              <p className="muted" style={{ textAlign: "center", marginTop: 40 }}>
+                {searchTerm ? "No matching text found." : "Document content is empty."}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </aside>
   );
 }
 

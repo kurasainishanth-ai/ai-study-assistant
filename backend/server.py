@@ -9,6 +9,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Query
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -161,17 +162,85 @@ def get_material_detail(doc_id: str):
         raise HTTPException(status_code=404, detail="Material not found")
     return material
 
+UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+
+@app.api_route("/api/materials/{doc_id}/file", methods=["GET", "HEAD"])
+def get_material_raw_file(doc_id: str):
+    """Serves the original uploaded file (e.g. PDF, images, txt) for direct previewing."""
+    material = db.get_material(doc_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    
+    # Check uploads directory for saved file with doc_id prefix
+    if os.path.exists(UPLOADS_DIR):
+        for fname in os.listdir(UPLOADS_DIR):
+            if fname.startswith(f"{doc_id}_") or fname.startswith(f"{doc_id}."):
+                filepath = os.path.join(UPLOADS_DIR, fname)
+                media_type = "application/pdf" if fname.lower().endswith(".pdf") else "application/octet-stream"
+                return FileResponse(
+                    filepath,
+                    media_type=media_type,
+                    content_disposition_type="inline",
+                    headers={"Content-Disposition": "inline"}
+                )
+
+    # Fallback for sample file
+    if doc_id == "sample_notes_doc" and os.path.exists("sample_notes.txt"):
+        return FileResponse(
+            "sample_notes.txt",
+            media_type="text/plain",
+            content_disposition_type="inline",
+            headers={"Content-Disposition": "inline"}
+        )
+
+    raise HTTPException(status_code=404, detail="Original document file not found on server")
+
+@app.post("/api/materials/{doc_id}/reupload")
+async def reupload_material_binary(doc_id: str, file: UploadFile = File(...)):
+    """Re-saves the original binary file for an existing material to enable native PDF preview.
+    Does NOT re-extract content — only persists the file for inline viewing."""
+    material = db.get_material(doc_id)
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
+    content = await file.read()
+    # Remove any previously saved copies for this doc_id to avoid duplicates
+    if os.path.exists(UPLOADS_DIR):
+        for fname in os.listdir(UPLOADS_DIR):
+            if fname.startswith(f"{doc_id}_") or fname.startswith(f"{doc_id}."):
+                try:
+                    os.remove(os.path.join(UPLOADS_DIR, fname))
+                except OSError:
+                    pass
+    persistent_filename = f"{doc_id}_{file.filename}"
+    persistent_path = os.path.join(UPLOADS_DIR, persistent_filename)
+    with open(persistent_path, "wb") as pf:
+        pf.write(content)
+    return {"success": True, "message": "File saved for native preview", "filename": persistent_filename}
+
 @app.post("/api/materials/upload")
 async def upload_material(file: UploadFile = File(...)):
     """Uploads and extracts a study file (PDF, PPTX, DOCX, Image, Text)."""
     suffix = os.path.splitext(file.filename)[1]
+    doc_id = f"doc_{int(time.time() * 1000)}"
+    
+    # Save a persistent copy in UPLOADS_DIR for side-by-side native viewing
+    persistent_filename = f"{doc_id}_{file.filename}"
+    persistent_path = os.path.join(UPLOADS_DIR, persistent_filename)
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
         content = await file.read()
         tmp_file.write(content)
         tmp_path = tmp_file.name
 
+    # Write persistent copy
+    try:
+        with open(persistent_path, "wb") as pf:
+            pf.write(content)
+    except Exception as e:
+        print(f"Warning: Failed to save persistent upload copy: {e}")
+
     size_kb = round(len(content) / 1024, 1)
-    doc_id = f"doc_{int(time.time() * 1000)}"
 
     try:
         extracted = extract_content(tmp_path)

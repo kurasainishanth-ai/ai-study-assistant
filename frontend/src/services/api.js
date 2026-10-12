@@ -19,6 +19,7 @@ export const api = {
   // Materials
   materials: () => request("/materials"),
   materialDetail: (id) => request("/materials/" + encodeURIComponent(id)),
+  materialFileUrl: (id) => `${BASE}/materials/${encodeURIComponent(id)}/file`,
   upload: (file) => {
     const body = new FormData();
     body.append("file", file);
@@ -27,6 +28,11 @@ export const api = {
   ingestYoutube: (url) => request("/materials/youtube", json({ url })),
   sample: () => request("/materials/sample", { method: "POST" }),
   remove: (id) => request("/materials/" + encodeURIComponent(id), { method: "DELETE" }),
+  reuploadMaterial: (id, file) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request("/materials/" + encodeURIComponent(id) + "/reupload", { method: "POST", body });
+  },
 
   // Notes
   generateNotes: (id, styleKey = "detailed") =>
