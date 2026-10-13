@@ -1,7 +1,63 @@
 import re
 import requests
 from typing import List, Dict, Any, Optional
-from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import (
+    YouTubeTranscriptApi,
+    TranscriptsDisabled,
+    NoTranscriptFound,
+    VideoUnavailable,
+    VideoUnplayable,
+    YouTubeTranscriptApiException,
+)
+
+def _clean_youtube_error(err_str: str) -> str:
+    """Strips boilerplate GitHub issue instructions from youtube_transcript_api error strings."""
+    lines = [
+        line.strip()
+        for line in err_str.splitlines()
+        if line.strip()
+        and not line.strip().startswith("If you are sure")
+        and not line.strip().startswith("Could not retrieve a transcript for the video")
+        and "https://github.com/jdepoix" not in line
+    ]
+    return " - ".join(lines) if lines else err_str.strip()
+
+
+def _extract_snippet_data(snippet: Any) -> tuple[str, float, float]:
+    """
+    Safely extracts (text, start, duration) from either a dictionary or
+    a snippet object (like FetchedTranscriptSnippet) without crashing on .get().
+    """
+    if isinstance(snippet, dict):
+        raw_text = snippet.get("text")
+        raw_start = snippet.get("start")
+        raw_duration = snippet.get("duration")
+    else:
+        raw_text = getattr(snippet, "text", None)
+        raw_start = getattr(snippet, "start", None)
+        raw_duration = getattr(snippet, "duration", None)
+
+    if raw_text is None and hasattr(snippet, "get"):
+        try:
+            raw_text = snippet.get("text")
+            raw_start = snippet.get("start")
+            raw_duration = snippet.get("duration")
+        except Exception:
+            pass
+
+    text = str(raw_text or "").strip()
+    try:
+        start = float(raw_start) if raw_start is not None else 0.0
+    except (ValueError, TypeError):
+        start = 0.0
+
+    try:
+        duration = float(raw_duration) if raw_duration is not None else 0.0
+    except (ValueError, TypeError):
+        duration = 0.0
+
+    return text, max(0.0, start), max(0.0, duration)
+
 
 def extract_youtube_id(url_or_id: str) -> Optional[str]:
     """
@@ -101,7 +157,7 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
         except Exception:
             # Fallback: find any manually created or generated transcript
             for t in transcript_list:
-                if not t.is_generated:
+                if not getattr(t, "is_generated", False):
                     chosen_transcript = t
                     break
             if not chosen_transcript:
@@ -113,6 +169,27 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
             raise ValueError(f"No transcripts/captions available for video '{video_id}'.")
 
         raw_snippets = chosen_transcript.fetch()
+    except TranscriptsDisabled:
+        raise ValueError(f"Subtitles/transcripts are disabled for YouTube video '{video_id}'.")
+    except NoTranscriptFound:
+        raise ValueError(
+            f"No transcripts found for YouTube video '{video_id}' in supported languages."
+        )
+    except VideoUnavailable:
+        raise ValueError(
+            f"YouTube video '{video_id}' is unavailable, private, or has been removed."
+        )
+    except VideoUnplayable:
+        raise ValueError(
+            f"YouTube video '{video_id}' is unplayable or restricted."
+        )
+    except YouTubeTranscriptApiException as e:
+        clean_msg = _clean_youtube_error(str(e))
+        raise ValueError(
+            f"Could not retrieve transcript for YouTube video ({video_id}): {clean_msg}"
+        )
+    except ValueError:
+        raise
     except Exception as e:
         raise ValueError(
             f"Could not retrieve transcript for YouTube video ({video_id}): {str(e)}. "
@@ -122,6 +199,13 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
     if not raw_snippets:
         raise ValueError(f"Transcript for YouTube video '{video_id}' is empty.")
 
+    # Convert FetchedTranscript to list of dicts if supported, while snippet extractor handles both
+    if hasattr(raw_snippets, "to_raw_data") and callable(raw_snippets.to_raw_data):
+        try:
+            raw_snippets = raw_snippets.to_raw_data()
+        except Exception:
+            pass
+
     # Group transcript snippets into coherent paragraphs with timestamps
     # Grouping rule: start a new chunk every 35-45 seconds or after ~60 words
     chunks = []
@@ -130,9 +214,7 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
     current_chunk_word_count = 0
 
     for snippet in raw_snippets:
-        text = (getattr(snippet, "text", None) or snippet.get("text", "")).strip()
-        start = float(getattr(snippet, "start", None) or snippet.get("start", 0.0))
-        duration = float(getattr(snippet, "duration", None) or snippet.get("duration", 0.0))
+        text, start, duration = _extract_snippet_data(snippet)
 
         if not text:
             continue
@@ -171,11 +253,13 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
             "text": " ".join(current_chunk_snippets)
         })
 
+    if not chunks:
+        raise ValueError(f"No readable speech or text found in transcript for YouTube video '{video_id}'.")
+
     # Calculate total duration
     last_snippet = raw_snippets[-1]
-    last_start = float(getattr(last_snippet, "start", None) or last_snippet.get("start", 0.0))
-    last_dur = float(getattr(last_snippet, "duration", None) or last_snippet.get("duration", 0.0))
-    total_seconds = last_start + last_dur
+    _, last_start, last_dur = _extract_snippet_data(last_snippet)
+    total_seconds = max(0.0, last_start + last_dur)
     formatted_total_duration = format_seconds(total_seconds)
 
     # Format full grounded text
@@ -206,5 +290,5 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
         "segments": chunks,
         "content": full_content,
         "file_name": f"{title} (YouTube)",
-        "language": chosen_transcript.language if hasattr(chosen_transcript, "language") else "en",
+        "language": getattr(chosen_transcript, "language", None) or getattr(chosen_transcript, "language_code", None) or "en",
     }
