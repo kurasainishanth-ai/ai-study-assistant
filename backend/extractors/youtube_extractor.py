@@ -4,27 +4,32 @@ from typing import List, Dict, Any, Optional
 from youtube_transcript_api import YouTubeTranscriptApi
 
 
-ACADEMIC_CONTEXT_HINTS = (
-    "academic", "education", "educational", "lecture", "lesson", "tutorial", "course",
-    "classroom", "teacher", "professor", "university", "college", "school", "study",
-    "learning", "learn", "explained", "explanation", "introduction to", "fundamentals",
-    "principles of", "exam prep", "revision", "curriculum", "syllabus", "worked example",
-    "problem solving", "mathematics", "math", "algebra", "calculus", "equation", "geometry",
-    "statistics", "physics", "chemistry", "biology", "anatomy", "neuroscience", "medicine",
+ACADEMIC_SUBJECT_HINTS = (
+    "operating system", "interprocess communication", "process scheduling", "semaphore",
+    "deadlock", "memory management", "computer network", "database", "data structure",
+    "algorithm", "discrete mathematics", "linear algebra", "differential equation",
+    "organic chemistry", "electromagnetism", "thermodynamics", "cell biology",
+    "mathematics", "math", "algebra", "calculus", "equation", "geometry", "statistics",
+    "physics", "chemistry", "biology", "anatomy", "neuroscience", "medicine",
     "computer science", "programming", "coding", "engineering", "economics", "history",
     "geography", "literature", "grammar", "linguistics", "philosophy", "psychology",
     "sociology", "political science", "climate science", "quantum", "neural network",
-    "artificial intelligence", "machine learning", "research methods", "data science",
+    "artificial intelligence", "machine learning", "deep learning", "research methods", "data science",
+    "evolution", "fibonacci", "cryptography", "black hole",
 )
-ACADEMIC_CHANNEL_HINTS = (
-    "khan academy", "3blue1brown", "crash course", "mit opencourseware", "openstax",
-    "ted-ed", "ted ed", "numberphile", "freecodecamp", "cs50", "coursera", "edx",
+ACADEMIC_INTENT_HINTS = (
+    "lecture", "lesson", "tutorial", "course", "class", "chapter", "unit ", "topic",
+    "how to", "how does", "how do", "what is", "why does", "why do", "introduction",
+    "fundamentals", "explained", "explanation", "concept", "worked example", "problem solving",
+    "exam prep", "revision", "curriculum", "syllabus", "principles of",
 )
 NON_ACADEMIC_FORMAT_HINTS = (
     "official trailer", "movie trailer", "film trailer", "teaser trailer", "official teaser",
     "full movie", "full film", "official music video", "music video", "official audio",
-    "soundtrack", "gameplay", "let's play", "lets play", "gaming stream", "reaction video",
-    "prank video", "daily vlog", "sports highlights", "marvel", "avengers",
+    "official song", "soundtrack", "live performance", "gameplay", "playthrough",
+    "let's play", "lets play", "gaming stream", "reaction video", "reacts to",
+    "prank video", "daily vlog", "vlog", "sports highlights", "movie review",
+    "marvel", "avengers",
     "doomsday", "superhero", "cinematic universe", "box office",
 )
 ACADEMIC_ONLY_MESSAGE = (
@@ -34,17 +39,45 @@ ACADEMIC_ONLY_MESSAGE = (
 
 
 def is_academic_context(title: str, author: str = "") -> bool:
-    """Conservatively require clear educational intent before fetching a transcript."""
+    """Classify from title signals only; author remains for API compatibility."""
     normalized_title = " ".join((title or "").casefold().split())
-    normalized_author = " ".join((author or "").casefold().split())
     if not normalized_title or normalized_title.startswith("youtube video ("):
         return False
     if any(hint in normalized_title for hint in NON_ACADEMIC_FORMAT_HINTS):
         return False
-    return (
-        any(hint in normalized_title for hint in ACADEMIC_CONTEXT_HINTS)
-        or any(hint in normalized_author for hint in ACADEMIC_CHANNEL_HINTS)
-    )
+    has_subject = any(hint in normalized_title for hint in ACADEMIC_SUBJECT_HINTS)
+    has_instructional_intent = any(hint in normalized_title for hint in ACADEMIC_INTENT_HINTS)
+    has_specific_topic = any(hint in normalized_title for hint in (
+        "operating system", "interprocess communication", "process scheduling", "semaphore",
+        "deadlock", "memory management", "computer network", "database", "data structure",
+        "algorithm", "discrete mathematics", "linear algebra", "differential equation",
+        "organic chemistry", "electromagnetism", "thermodynamics", "cell biology",
+        "evolution", "fibonacci", "cryptography", "black hole",
+    ))
+    # Known course concepts can stand alone (e.g. "Interprocess Communication").
+    # Broad subject labels require an instructional cue. Creator identity is ignored.
+    return has_specific_topic or (has_subject and has_instructional_intent)
+
+
+def _snippet_value(snippet: Any, key: str, default: Any = None) -> Any:
+    """Read both legacy dict snippets and current dataclass snippets."""
+    if isinstance(snippet, dict):
+        return snippet[key] if key in snippet else default
+    return getattr(snippet, key, default)
+
+
+def _transcript_error_message(error: Exception, video_id: str) -> str:
+    """Map transcript library errors to their actual user-facing cause."""
+    error_type = type(error).__name__
+    if error_type in {"RequestBlocked", "IpBlocked"}:
+        return "YouTube temporarily blocked transcript requests from this network. Try again later or from another network."
+    if error_type == "TranscriptsDisabled":
+        return "Captions are disabled for this video, so a transcript is not available."
+    if error_type == "NoTranscriptFound":
+        return "YouTube has no captions in a language this app can use for this video."
+    if error_type in {"VideoUnavailable", "VideoUnplayable", "AgeRestricted"}:
+        return f"YouTube does not allow this video to be read here ({error_type})."
+    return f"Could not retrieve captions for video {video_id} ({error_type}): {error}"
 
 def extract_youtube_id(url_or_id: str) -> Optional[str]:
     """
@@ -161,10 +194,7 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
 
         raw_snippets = chosen_transcript.fetch()
     except Exception as e:
-        raise ValueError(
-            f"Could not retrieve transcript for YouTube video ({video_id}): {str(e)}. "
-            "Please ensure the video has English, Hindi, or auto-generated captions enabled."
-        )
+        raise ValueError(_transcript_error_message(e, video_id)) from e
 
     if not raw_snippets:
         raise ValueError(f"Transcript for YouTube video '{video_id}' is empty.")
@@ -177,9 +207,9 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
     current_chunk_word_count = 0
 
     for snippet in raw_snippets:
-        text = (getattr(snippet, "text", None) or snippet.get("text", "")).strip()
-        start = float(getattr(snippet, "start", None) or snippet.get("start", 0.0))
-        duration = float(getattr(snippet, "duration", None) or snippet.get("duration", 0.0))
+        text = str(_snippet_value(snippet, "text", "") or "").strip()
+        start = float(_snippet_value(snippet, "start", 0.0) or 0.0)
+        duration = float(_snippet_value(snippet, "duration", 0.0) or 0.0)
 
         if not text:
             continue
@@ -220,8 +250,8 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
 
     # Calculate total duration
     last_snippet = raw_snippets[-1]
-    last_start = float(getattr(last_snippet, "start", None) or last_snippet.get("start", 0.0))
-    last_dur = float(getattr(last_snippet, "duration", None) or last_snippet.get("duration", 0.0))
+    last_start = float(_snippet_value(last_snippet, "start", 0.0) or 0.0)
+    last_dur = float(_snippet_value(last_snippet, "duration", 0.0) or 0.0)
     total_seconds = last_start + last_dur
     formatted_total_duration = format_seconds(total_seconds)
 
