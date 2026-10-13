@@ -40,6 +40,8 @@ from services.flashcard_service import generate_flashcards
 from services.quiz_service import generate_quiz, evaluate_quiz
 from services.knowledge_map_service import generate_knowledge_map
 from services.visual_service import explain_visual_diagram, generate_concept_illustration
+from services.infographic_service import generate_infographic, INFOGRAPHIC_TYPES
+from services.scheduler_service import get_material_topics, generate_revision_plan
 
 # Initialize SQLite database on startup
 db.init_db()
@@ -112,6 +114,22 @@ class RenameMaterialRequest(BaseModel):
 class YouTubeIngestRequest(BaseModel):
     url: str
 
+class InfographicRequest(BaseModel):
+    doc_id: str
+    infographic_type: str = "concept_overview"
+
+class GeneratePlanRequest(BaseModel):
+    doc_id: str
+    exam_date: str
+    daily_hours: float = 2.0
+    start_date: Optional[str] = None
+    topic_overrides: Optional[Dict[str, str]] = None
+
+class TaskStatusRequest(BaseModel):
+    doc_id: str
+    task_id: str
+    completed: bool
+
 
 # --- Helper ---
 def get_friendly_file_type(filename: str) -> str:
@@ -151,6 +169,20 @@ def _require_academic_sources(source_ids: Optional[str]):
             metadata = material.get("metadata") or {}
             if metadata.get("academic_context_validated") is not True:
                 raise HTTPException(status_code=400, detail=ACADEMIC_ONLY_MESSAGE)
+
+
+def _require_ready_sources(source_ids: Optional[str]):
+    """Require every selected source to be extracted before generating study tools."""
+    if not source_ids:
+        raise HTTPException(status_code=400, detail="Choose at least one study material first.")
+    for source_id in (part.strip() for part in source_ids.split(",")):
+        if not source_id:
+            continue
+        material = db.get_material(source_id)
+        if not material:
+            raise HTTPException(status_code=404, detail=f"Study material '{source_id}' was not found.")
+        if material.get("status") != "Ready" or not material.get("content"):
+            raise HTTPException(status_code=400, detail="Study material must finish processing before generating study tools.")
 
 
 # =========================================================
@@ -675,6 +707,98 @@ def generate_knowledge_map_endpoint(doc_id: str):
         return graph
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# =========================================================
+# 8. Infographics and Revision Scheduler
+# =========================================================
+
+@app.get("/api/infographic/types")
+def get_infographic_types():
+    return {
+        "types": [
+            {"key": key, "title": value["title"], "description": value["description"]}
+            for key, value in INFOGRAPHIC_TYPES.items()
+        ]
+    }
+
+
+@app.get("/api/infographic/{doc_id}")
+def get_infographic_endpoint(doc_id: str):
+    _require_academic_sources(doc_id)
+    return db.get_infographic(doc_id) or {"doc_id": doc_id, "data": None}
+
+
+@app.post("/api/infographic/generate")
+def generate_infographic_endpoint(req: InfographicRequest):
+    _require_academic_sources(req.doc_id)
+    _require_ready_sources(req.doc_id)
+    try:
+        return generate_infographic(req.doc_id, req.infographic_type)
+    except GeminiClientAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except GeminiServiceAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except (GeminiQuotaExhaustedError, GeminiServiceQuotaExhaustedError) as exc:
+        raise HTTPException(status_code=429, detail=f"API quota exhausted: {str(exc)}")
+    except (GeminiRateLimitError, GeminiServiceRateLimitError) as exc:
+        raise HTTPException(status_code=429, detail=f"Rate limit reached, please try again shortly: {str(exc)}")
+    except (GeminiTemporaryUnavailableError, GeminiServiceTemporaryError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Infographic generation error: {str(exc)}")
+
+
+@app.get("/api/scheduler/topics/{doc_id}")
+def get_scheduler_topics_endpoint(doc_id: str):
+    _require_academic_sources(doc_id)
+    _require_ready_sources(doc_id)
+    try:
+        return get_material_topics(doc_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Topic extraction error: {str(exc)}")
+
+
+@app.get("/api/scheduler/{doc_id}")
+def get_scheduler_plan_endpoint(doc_id: str):
+    _require_academic_sources(doc_id)
+    return db.get_revision_plan(doc_id) or {"doc_id": doc_id, "plan_data": None}
+
+
+@app.post("/api/scheduler/generate")
+def generate_scheduler_plan_endpoint(req: GeneratePlanRequest):
+    _require_academic_sources(req.doc_id)
+    _require_ready_sources(req.doc_id)
+    try:
+        return generate_revision_plan(
+            doc_id=req.doc_id,
+            exam_date_str=req.exam_date,
+            daily_hours=req.daily_hours,
+            start_date_str=req.start_date,
+            topic_overrides=req.topic_overrides,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Scheduler plan generation error: {str(exc)}")
+
+
+@app.post("/api/scheduler/task-status")
+def update_task_status_endpoint(req: TaskStatusRequest):
+    _require_academic_sources(req.doc_id)
+    try:
+        updated = db.update_revision_task_status(req.doc_id, req.task_id, req.completed)
+        if not updated:
+            raise HTTPException(status_code=404, detail=f"Revision plan or task not found for '{req.doc_id}'.")
+        return updated
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Task status update error: {str(exc)}")
 
 
 # =========================================================

@@ -85,7 +85,7 @@ Runtime files such as `.env`, the local database, uploaded documents, Python env
 - Import PDF, DOCX, PPTX, image, and text study materials, plus academic YouTube transcripts. Video ingestion is limited to clearly instructional content such as lectures, lessons, tutorials, and subject-focused explainers. Entertainment, trailers, music, gaming, reactions, and other non-academic videos are rejected before transcript retrieval.
 - Upload one or multiple files. Files appear in the Library while text extraction runs in the background; they become available to Study Studio and AI Tutor when their status changes to **Ready**.
 - Generate summaries in multiple styles and ask questions grounded in uploaded material.
-- Create flashcards, diagnostic quizzes, and interactive knowledge maps.
+- Create flashcards, diagnostic quizzes, interactive knowledge maps, downloadable infographics, and personalized revision schedules with trackable daily tasks.
 - Store study materials and generated outputs in a local SQLite database.
 
 ## Troubleshooting
