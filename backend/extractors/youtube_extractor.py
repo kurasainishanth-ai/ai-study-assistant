@@ -2,61 +2,11 @@ import re
 import requests
 from typing import List, Dict, Any, Optional
 from youtube_transcript_api import YouTubeTranscriptApi
+from services.youtube_video_analyzer import analyze_youtube_transcript, analyze_youtube_video
 
 
-ACADEMIC_SUBJECT_HINTS = (
-    "operating system", "interprocess communication", "process scheduling", "semaphore",
-    "deadlock", "memory management", "computer network", "database", "data structure",
-    "algorithm", "discrete mathematics", "linear algebra", "differential equation",
-    "organic chemistry", "electromagnetism", "thermodynamics", "cell biology",
-    "mathematics", "math", "algebra", "calculus", "equation", "geometry", "statistics",
-    "physics", "chemistry", "biology", "anatomy", "neuroscience", "medicine",
-    "computer science", "programming", "coding", "engineering", "economics", "history",
-    "geography", "literature", "grammar", "linguistics", "philosophy", "psychology",
-    "sociology", "political science", "climate science", "quantum", "neural network",
-    "artificial intelligence", "machine learning", "deep learning", "research methods", "data science",
-    "evolution", "fibonacci", "cryptography", "black hole",
-)
-ACADEMIC_INTENT_HINTS = (
-    "lecture", "lesson", "tutorial", "course", "class", "chapter", "unit ", "topic",
-    "how to", "how does", "how do", "what is", "why does", "why do", "introduction",
-    "fundamentals", "explained", "explanation", "concept", "worked example", "problem solving",
-    "exam prep", "revision", "curriculum", "syllabus", "principles of",
-)
-NON_ACADEMIC_FORMAT_HINTS = (
-    "official trailer", "movie trailer", "film trailer", "teaser trailer", "official teaser",
-    "full movie", "full film", "official music video", "music video", "official audio",
-    "official song", "soundtrack", "live performance", "gameplay", "playthrough",
-    "let's play", "lets play", "gaming stream", "reaction video", "reacts to",
-    "prank video", "daily vlog", "vlog", "sports highlights", "movie review",
-    "marvel", "avengers",
-    "doomsday", "superhero", "cinematic universe", "box office",
-)
-ACADEMIC_ONLY_MESSAGE = (
-    "This video does not appear to be academic or instructional. StudyVerse only accepts "
-    "course material such as lectures, lessons, tutorials, and subject-focused explainers."
-)
-
-
-def is_academic_context(title: str, author: str = "") -> bool:
-    """Classify from title signals only; author remains for API compatibility."""
-    normalized_title = " ".join((title or "").casefold().split())
-    if not normalized_title or normalized_title.startswith("youtube video ("):
-        return False
-    if any(hint in normalized_title for hint in NON_ACADEMIC_FORMAT_HINTS):
-        return False
-    has_subject = any(hint in normalized_title for hint in ACADEMIC_SUBJECT_HINTS)
-    has_instructional_intent = any(hint in normalized_title for hint in ACADEMIC_INTENT_HINTS)
-    has_specific_topic = any(hint in normalized_title for hint in (
-        "operating system", "interprocess communication", "process scheduling", "semaphore",
-        "deadlock", "memory management", "computer network", "database", "data structure",
-        "algorithm", "discrete mathematics", "linear algebra", "differential equation",
-        "organic chemistry", "electromagnetism", "thermodynamics", "cell biology",
-        "evolution", "fibonacci", "cryptography", "black hole",
-    ))
-    # Known course concepts can stand alone (e.g. "Interprocess Communication").
-    # Broad subject labels require an instructional cue. Creator identity is ignored.
-    return has_specific_topic or (has_subject and has_instructional_intent)
+ACADEMIC_ONLY_MESSAGE = "Gemini determined that this video is not primarily academic or instructional."
+UNCERTAIN_CONTENT_MESSAGE = "Gemini could not confidently verify that this video is academic from its content."
 
 
 def _snippet_value(snippet: Any, key: str, default: Any = None) -> Any:
@@ -78,6 +28,69 @@ def _transcript_error_message(error: Exception, video_id: str) -> str:
     if error_type in {"VideoUnavailable", "VideoUnplayable", "AgeRestricted"}:
         return f"YouTube does not allow this video to be read here ({error_type})."
     return f"Could not retrieve captions for video {video_id} ({error_type}): {error}"
+
+
+def _read_captions(video_id: str, target_langs: List[str]):
+    """Return one usable caption track; don't make eligibility decisions here."""
+    transcript_list = YouTubeTranscriptApi().list(video_id)
+    chosen_transcript = None
+    try:
+        chosen_transcript = transcript_list.find_transcript(target_langs)
+    except Exception:
+        # An English track isn't required; retain the original speech language.
+        for transcript in transcript_list:
+            if not transcript.is_generated:
+                chosen_transcript = transcript
+                break
+        if chosen_transcript is None:
+            for transcript in transcript_list:
+                chosen_transcript = transcript
+                break
+    if chosen_transcript is None:
+        raise RuntimeError("YouTube returned no caption tracks for this video.")
+    return chosen_transcript, chosen_transcript.fetch()
+
+
+def _caption_segments(raw_snippets: Any) -> List[Dict[str, Any]]:
+    segments = []
+    for snippet in raw_snippets:
+        text = str(_snippet_value(snippet, "text", "") or "").strip()
+        if not text:
+            continue
+        start = max(0.0, float(_snippet_value(snippet, "start", 0.0) or 0.0))
+        segments.append({"timestamp": format_seconds(start), "seconds": int(start), "text": text})
+    return segments
+
+
+def _gemini_segments(raw_segments: Any) -> List[Dict[str, Any]]:
+    segments = []
+    if not isinstance(raw_segments, list):
+        return segments
+    for segment in raw_segments:
+        if not isinstance(segment, dict):
+            continue
+        text = str(segment.get("text", "")).strip()
+        if not text:
+            continue
+        try:
+            seconds = max(0.0, float(segment.get("start_seconds", 0.0)))
+        except (TypeError, ValueError):
+            continue
+        segments.append({"timestamp": format_seconds(seconds), "seconds": int(seconds), "text": text})
+    return sorted(segments, key=lambda item: item["seconds"])
+
+
+def _render_segments(segments: List[Dict[str, Any]]) -> str:
+    return "\n\n".join(f"[{segment['timestamp']}] {segment['text']}" for segment in segments)
+
+
+def _academic_decision(analysis: Dict[str, Any]) -> None:
+    if analysis["decision"] == "non_academic":
+        reason = analysis.get("evidence") or analysis.get("category") or "the content is not instructional"
+        raise ValueError(f"{ACADEMIC_ONLY_MESSAGE} Gemini's assessment: {reason}")
+    if analysis["decision"] != "academic":
+        reason = analysis.get("evidence") or "there was not enough accessible instructional content"
+        raise ValueError(f"{UNCERTAIN_CONTENT_MESSAGE} Gemini's assessment: {reason}")
 
 def extract_youtube_id(url_or_id: str) -> Optional[str]:
     """
@@ -163,111 +176,97 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
     author = metadata["author"]
     thumbnail_url = metadata["thumbnail_url"]
     video_url = metadata["video_url"]
-
-    # Reject entertainment and ambiguous videos before requesting captions.
-    if not is_academic_context(title, author):
-        raise ValueError(ACADEMIC_ONLY_MESSAGE)
-
     target_langs = languages or ["en", "en-US", "en-GB", "hi"]
 
+    chosen_transcript = None
+    caption_error = None
+    caption_segments: List[Dict[str, Any]] = []
+    raw_snippets = None
     try:
-        api = YouTubeTranscriptApi()
-        transcript_list = api.list(video_id)
+        chosen_transcript, raw_snippets = _read_captions(video_id, target_langs)
+        caption_segments = _caption_segments(raw_snippets)
+        if not caption_segments:
+            raise RuntimeError("YouTube returned an empty or unreadable caption track.")
+    except Exception as error:
+        caption_error = error
 
-        # Try to find transcript matching target languages
-        chosen_transcript = None
+    transcript_text = "\n".join(segment["text"] for segment in caption_segments)
+    analysis = None
+    video_analysis_error = None
+    try:
+        analysis = analyze_youtube_video(
+            video_url,
+            title=title,
+            include_transcript=not bool(caption_segments),
+        )
+    except Exception as error:
+        video_analysis_error = error
+
+    # Direct video understanding evaluates speech and visuals. If Gemini cannot
+    # access the URL or cannot decide, use the retrieved speech as content evidence.
+    if caption_segments and (
+        analysis is None or analysis.get("decision") == "uncertain"
+    ):
         try:
-            chosen_transcript = transcript_list.find_transcript(target_langs)
-        except Exception:
-            # Fallback: find any manually created or generated transcript
-            for t in transcript_list:
-                if not t.is_generated:
-                    chosen_transcript = t
-                    break
-            if not chosen_transcript:
-                for t in transcript_list:
-                    chosen_transcript = t
-                    break
+            analysis = analyze_youtube_transcript(title, transcript_text)
+        except Exception as transcript_analysis_error:
+            raise ValueError(
+                "Gemini could not review the video's content. "
+                f"Video review: {video_analysis_error or 'inconclusive'}. "
+                f"Caption review: {transcript_analysis_error}"
+            ) from transcript_analysis_error
 
-        if not chosen_transcript:
-            raise ValueError(f"No transcripts/captions available for video '{video_id}'.")
+    if analysis is None:
+        caption_details = (
+            _transcript_error_message(caption_error, video_id)
+            if caption_error else "YouTube returned no usable captions."
+        )
+        raise ValueError(
+            "Gemini could not inspect this YouTube video, and caption retrieval also failed. "
+            f"Video review: {video_analysis_error}. Captions: {caption_details}"
+        ) from video_analysis_error
 
-        raw_snippets = chosen_transcript.fetch()
-    except Exception as e:
-        raise ValueError(_transcript_error_message(e, video_id)) from e
+    _academic_decision(analysis)
 
-    if not raw_snippets:
-        raise ValueError(f"Transcript for YouTube video '{video_id}' is empty.")
+    transcript_source = "youtube_captions"
+    segments = caption_segments
+    if not segments:
+        segments = _gemini_segments(analysis.get("transcript_segments"))
+        transcript_source = "gemini_video_analysis"
+        if not segments:
+            caption_details = (
+                _transcript_error_message(caption_error, video_id)
+                if caption_error else "YouTube returned no usable captions."
+            )
+            raise ValueError(
+                "Gemini verified the video as academic but could not produce timestamped study text. "
+                f"Caption retrieval: {caption_details}"
+            )
 
-    # Group transcript snippets into coherent paragraphs with timestamps
-    # Grouping rule: start a new chunk every 35-45 seconds or after ~60 words
-    chunks = []
-    current_chunk_snippets = []
-    current_chunk_start = 0.0
-    current_chunk_word_count = 0
-
-    for snippet in raw_snippets:
-        text = str(_snippet_value(snippet, "text", "") or "").strip()
-        start = float(_snippet_value(snippet, "start", 0.0) or 0.0)
-        duration = float(_snippet_value(snippet, "duration", 0.0) or 0.0)
-
-        if not text:
-            continue
-
-        words = len(text.split())
-
-        if not current_chunk_snippets:
-            current_chunk_start = start
-            current_chunk_snippets.append(text)
-            current_chunk_word_count = words
-        else:
-            time_diff = start - current_chunk_start
-            if time_diff >= 35.0 or current_chunk_word_count >= 50:
-                # Save previous chunk
-                ts_str = format_seconds(current_chunk_start)
-                chunk_body = " ".join(current_chunk_snippets)
-                chunks.append({
-                    "timestamp": ts_str,
-                    "seconds": int(current_chunk_start),
-                    "text": chunk_body
-                })
-                # Start new chunk
-                current_chunk_start = start
-                current_chunk_snippets = [text]
-                current_chunk_word_count = words
-            else:
-                current_chunk_snippets.append(text)
-                current_chunk_word_count += words
-
-    # Add trailing chunk
-    if current_chunk_snippets:
-        ts_str = format_seconds(current_chunk_start)
-        chunks.append({
-            "timestamp": ts_str,
-            "seconds": int(current_chunk_start),
-            "text": " ".join(current_chunk_snippets)
-        })
-
-    # Calculate total duration
-    last_snippet = raw_snippets[-1]
-    last_start = float(_snippet_value(last_snippet, "start", 0.0) or 0.0)
-    last_dur = float(_snippet_value(last_snippet, "duration", 0.0) or 0.0)
-    total_seconds = last_start + last_dur
+    last_segment = segments[-1]
+    if transcript_source == "youtube_captions" and raw_snippets:
+        last_snippet = raw_snippets[-1]
+        last_start = float(_snippet_value(last_snippet, "start", 0.0) or 0.0)
+        last_duration = float(_snippet_value(last_snippet, "duration", 0.0) or 0.0)
+        total_seconds = last_start + last_duration
+    else:
+        total_seconds = last_segment["seconds"] + 30.0
+    total_seconds = max(0.0, total_seconds)
     formatted_total_duration = format_seconds(total_seconds)
 
-    # Format full grounded text
+    source_label = "YouTube captions" if transcript_source == "youtube_captions" else "Gemini video transcription"
     header = (
-        f"=== YOUTUBE LECTURE: {title} ===\n"
+        f"=== ACADEMIC YOUTUBE VIDEO: {title} ===\n"
         f"Channel: {author}\n"
         f"Video URL: {video_url}\n"
-        f"Total Duration: {formatted_total_duration}\n"
-        f"Timestamped Transcript Units: {len(chunks)} sections\n\n"
+        f"Content review: {analysis.get('category', 'academic instruction')} "
+        f"(confidence {analysis.get('confidence', 0.0):.0%})\n"
+        f"Content evidence: {analysis.get('evidence', 'Gemini verified instructional content')}\n"
+        f"Transcript source: {source_label}\n"
+        f"Duration: {formatted_total_duration}\n"
+        f"Timestamped sections: {len(segments)}\n\n"
     )
-    formatted_body_lines = []
-    for c in chunks:
-        formatted_body_lines.append(f"[{c['timestamp']}] {c['text']}")
-
-    full_content = header + "\n\n".join(formatted_body_lines)
+    full_content = header + _render_segments(segments)
 
     return {
         "type": "youtube",
@@ -278,11 +277,18 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
         "thumbnail_url": thumbnail_url,
         "duration_seconds": int(total_seconds),
         "duration_formatted": formatted_total_duration,
-        "total_units": len(chunks),
+        "total_units": len(segments),
         "unit_name": "timestamps",
-        "segments": chunks,
+        "segments": segments,
         "content": full_content,
         "file_name": f"{title} (YouTube)",
-        "language": chosen_transcript.language if hasattr(chosen_transcript, "language") else "en",
+        "language": (
+            getattr(chosen_transcript, "language", None)
+            if transcript_source == "youtube_captions" else analysis.get("language", "unknown")
+        ) or "unknown",
         "academic_context_validated": True,
+        "academic_context_category": analysis.get("category", "academic instruction"),
+        "academic_context_confidence": analysis.get("confidence", 0.0),
+        "academic_context_evidence": analysis.get("evidence", ""),
+        "transcript_source": transcript_source,
     }

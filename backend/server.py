@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from config import get_gemini_client, DEFAULT_MODEL, CONFIGURED_MODEL, GEMINI_API_KEY
 from extractors import extract_content, extract_youtube_content, SUPPORTED_EXTENSIONS
-from extractors.youtube_extractor import ACADEMIC_ONLY_MESSAGE, is_academic_context
+from extractors.youtube_extractor import ACADEMIC_ONLY_MESSAGE
 from summarizer import (
     generate_study_summary,
     SUMMARY_STYLES,
@@ -373,11 +373,8 @@ def ingest_youtube_endpoint(req: YouTubeIngestRequest):
 
     try:
         extracted = extract_youtube_content(url)
-        if extracted.get("academic_context_validated") is not True and not is_academic_context(
-            extracted.get("title", ""), extracted.get("author", "")
-        ):
-            raise ValueError(ACADEMIC_ONLY_MESSAGE)
-        extracted["academic_context_validated"] = True
+        if extracted.get("academic_context_validated") is not True:
+            raise ValueError("Gemini content review was not completed; this video was not ingested.")
         video_id = extracted["youtube_id"]
         doc_id = f"yt_{video_id}_{int(time.time())}"
         size_kb = round(len(extracted["content"]) / 1024, 1)
@@ -400,6 +397,10 @@ def ingest_youtube_endpoint(req: YouTubeIngestRequest):
                 "youtube_id": extracted["youtube_id"],
                 "segments": extracted["segments"],
                 "academic_context_validated": True,
+                "academic_context_category": extracted.get("academic_context_category"),
+                "academic_context_confidence": extracted.get("academic_context_confidence"),
+                "academic_context_evidence": extracted.get("academic_context_evidence"),
+                "transcript_source": extracted.get("transcript_source"),
             }
         }
         db.save_material(item)

@@ -124,7 +124,10 @@ def call_gemini_with_retry(
     contents: List[Any],
     system_instruction: Optional[str] = None,
     temperature: float = 0.3,
-    model: str = DEFAULT_MODEL
+    model: str = DEFAULT_MODEL,
+    response_mime_type: Optional[str] = None,
+    response_schema: Optional[Any] = None,
+    max_output_tokens: Optional[int] = None,
 ) -> str:
     """
     Executes client.models.generate_content with automatic exponential backoff retry
@@ -134,6 +137,9 @@ def call_gemini_with_retry(
     config = types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=temperature,
+        response_mime_type=response_mime_type,
+        response_schema=response_schema,
+        max_output_tokens=max_output_tokens,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
     )
 

@@ -3581,7 +3581,7 @@ function UploadModal({ busy, close, choose, sample, onIngestYoutube }) {
         ) : (
           <div>
             <p style={{ color: 'var(--fg-2)', fontSize: 13, marginBottom: 12 }}>
-              Only academic and instructional videos are accepted, such as course lectures, lessons, tutorials, and subject-focused explainers. Entertainment, movie trailers, music, gaming, reactions, and other non-academic videos are rejected before transcript retrieval.
+              Gemini reviews the video's actual speech and visuals for academic or instructional content, regardless of channel or title. Captions are used when available; if they cannot be retrieved, Gemini may transcribe the public video directly.
             </p>
 
             <form onSubmit={handleYtSubmit}>

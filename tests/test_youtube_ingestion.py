@@ -4,7 +4,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import unittest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
-from server import app
+from fastapi import HTTPException
+from server import app, ingest_youtube_endpoint, YouTubeIngestRequest
 from extractors.youtube_extractor import (
     extract_youtube_id,
     format_seconds,
@@ -39,12 +40,21 @@ class TestYouTubeIngestion(unittest.TestCase):
 
     @patch('extractors.youtube_extractor.get_youtube_metadata')
     @patch('extractors.youtube_extractor.YouTubeTranscriptApi')
-    def test_extract_youtube_content_success(self, mock_yt_api, mock_meta):
+    @patch('extractors.youtube_extractor.analyze_youtube_video')
+    def test_extract_youtube_content_success(self, mock_analyze_video, mock_yt_api, mock_meta):
         mock_meta.return_value = {
             "title": "Deep Learning Lecture",
             "author": "Prof AI",
             "thumbnail_url": "https://img.youtube.com/vi/test1234567/hqdefault.jpg",
             "video_url": "https://www.youtube.com/watch?v=test1234567"
+        }
+        mock_analyze_video.return_value = {
+            "decision": "academic",
+            "confidence": 0.97,
+            "category": "computer science lecture",
+            "evidence": "The content teaches neural network concepts.",
+            "transcript_segments": [],
+            "language": "English",
         }
 
         mock_instance = MagicMock()
@@ -71,8 +81,9 @@ class TestYouTubeIngestion(unittest.TestCase):
         self.assertIn("[00:50] Let us look at gradient descent", result["content"])
         self.assertTrue(len(result["segments"]) >= 2)
 
+    @patch('server.db.save_material')
     @patch('server.extract_youtube_content')
-    def test_youtube_endpoint(self, mock_extract):
+    def test_youtube_endpoint(self, mock_extract, mock_save_material):
         mock_extract.return_value = {
             "type": "youtube",
             "youtube_id": "test1234567",
@@ -86,15 +97,42 @@ class TestYouTubeIngestion(unittest.TestCase):
             "unit_name": "timestamps",
             "segments": [{"timestamp": "00:00", "seconds": 0, "text": "Intro"}],
             "content": "=== YOUTUBE LECTURE ===\n\n[00:00] Intro",
-            "file_name": "Introduction to AI (YouTube)"
+            "file_name": "Introduction to AI (YouTube)",
+            "academic_context_validated": True,
+            "academic_context_category": "computer science lesson",
+            "academic_context_confidence": 0.98,
+            "academic_context_evidence": "The video teaches introductory AI concepts.",
+            "transcript_source": "youtube_captions",
         }
 
-        resp = self.client.post("/api/materials/youtube", json={"url": "https://www.youtube.com/watch?v=test1234567"})
-        self.assertEqual(resp.status_code, 200)
-        data = resp.json()
+        data = ingest_youtube_endpoint(YouTubeIngestRequest(url="https://www.youtube.com/watch?v=test1234567"))
         self.assertTrue(data["success"])
         self.assertEqual(data["material"]["name"], "Introduction to AI")
         self.assertEqual(data["material"]["type"], "YouTube Lecture")
+        mock_save_material.assert_called_once()
+
+    @patch('server.db.save_material')
+    @patch('server.extract_youtube_content')
+    def test_youtube_endpoint_requires_gemini_content_review(self, mock_extract, mock_save_material):
+        mock_extract.return_value = {
+            "type": "youtube",
+            "youtube_id": "test1234567",
+            "video_url": "https://www.youtube.com/watch?v=test1234567",
+            "title": "Introduction to AI",
+            "author": "Trusted Academic Channel",
+            "thumbnail_url": "https://img.youtube.com/vi/test1234567/hqdefault.jpg",
+            "duration_seconds": 120,
+            "duration_formatted": "02:00",
+            "total_units": 1,
+            "unit_name": "timestamps",
+            "segments": [{"timestamp": "00:00", "seconds": 0, "text": "Content"}],
+            "content": "Transcript",
+        }
+        with self.assertRaises(HTTPException) as raised:
+            ingest_youtube_endpoint(YouTubeIngestRequest(url="https://youtu.be/test1234567"))
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("Gemini content review was not completed", raised.exception.detail)
+        mock_save_material.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

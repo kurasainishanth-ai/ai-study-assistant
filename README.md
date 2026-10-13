@@ -82,7 +82,7 @@ Runtime files such as `.env`, the local database, uploaded documents, Python env
 
 ## Features
 
-- Import PDF, DOCX, PPTX, image, and text study materials, plus academic YouTube transcripts. Video eligibility is judged from the title's academic subject and instructional cues, regardless of channel; clearly entertainment-focused titles are rejected before requesting captions. YouTube videos still need retrievable captions; videos without captions or requests temporarily blocked by YouTube cannot be transcribed.
+- Import PDF, DOCX, PPTX, image, and text study materials, plus academic YouTube transcripts. Gemini reviews public YouTube video content, rather than using a channel allowlist or title-only gate, to decide whether the video teaches academic material. It uses YouTube captions when available and can attempt direct video analysis and timestamped transcription when captions cannot be retrieved.
 - Upload one or multiple files. Files appear in the Library while text extraction runs in the background; they become available to Study Studio and AI Tutor when their status changes to **Ready**.
 - Generate summaries in multiple styles and ask questions grounded in uploaded material.
 - Create flashcards, diagnostic quizzes, interactive knowledge maps, downloadable infographics, and personalized revision schedules with trackable daily tasks.
@@ -94,7 +94,7 @@ Runtime files such as `.env`, the local database, uploaded documents, Python env
 - **AI features report an API key error:** Confirm `.env` is in the project root and contains a valid `GEMINI_API_KEY` value. Restart the app after changing it.
 - **A port is already in use:** Stop the other process using port 8000 or 5173, then run `start.bat` again.
 - **Dependencies are incomplete:** Run `setup.bat` again. It is safe to rerun.
-- **A YouTube video is rejected or has no transcript:** Check that its title identifies an academic subject or instructional purpose and that captions are available. A temporary YouTube request block is different from a video with captions disabled; wait and retry if the app reports a network block.
+- **A YouTube video is rejected or has no transcript:** The app asks Gemini to review video content and uses its assessment evidence in the error message. Direct analysis requires a public YouTube video and a working Gemini API key. When both Gemini video access and caption retrieval fail, the error reports both causes; private, age-restricted, or otherwise inaccessible videos may not be ingestible.
 
 ## Tests
 

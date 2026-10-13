@@ -5,7 +5,7 @@ python-multipart>=0.0.12
 python-dotenv>=1.0.0
 
 # Gemini AI SDK
-google-genai>=0.1.0
+google-genai>=1.10.0
 
 # Document & Multimodal Content Extractors
 pypdf>=4.0.0
