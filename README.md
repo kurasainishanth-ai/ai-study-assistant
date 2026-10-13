@@ -1,136 +1,109 @@
-# 🎓 StudyVerse: Multimodal AI Study Assistant
+# StudyVerse: AI Study Assistant
 
-StudyVerse is a modern, AI-powered study platform built to transform study materials into interactive learning tools. Upload document formats (PDF, DOCX, PPTX, Images, and Text) and StudyVerse will automatically extract knowledge, generate Smart Notes, create Flashcards, build Diagnostic Quizzes, render interactive Knowledge Maps, and answer your questions via a grounded AI Tutor.
+StudyVerse turns study materials into notes, flashcards, quizzes, knowledge maps, and tutor conversations grounded in your documents. The project uses a FastAPI backend, a React/Vite frontend, SQLite for local storage, and Google Gemini for AI features.
 
----
+## Quick start on Windows
 
-## ⚡ 1-Click Quick Start ("Jugaad" Launchers)
+### Requirements
 
-No need to open multiple terminals or type long commands! We provided 1-click single-button launchers for Windows, macOS, and Linux:
+- Python 3.10 or newer
+- Node.js 18 or newer (includes npm)
+- A Gemini API key for AI features: [Google AI Studio](https://aistudio.google.com/app/apikey)
 
-### 🚀 Launch Backend + Frontend + Open Browser (1-Click)
-* **Windows**: Double-click **`start.bat`** (or run `.\start.bat` in terminal).
-* **macOS / Linux**: Run **`./start.sh`** (or `python3 run.py`).
+### Install and run
 
-> *This launcher automatically checks requirements, installs any missing Python/NPM packages, fires up both the FastAPI backend and Vite React frontend, and opens `http://localhost:5173` in your default browser automatically!*
+1. Clone the repository, or download and extract the GitHub ZIP. Open the project folder (the folder containing `setup.bat`).
+2. Double-click `setup.bat`. It creates a Python virtual environment, installs the backend and frontend dependencies, and creates `.env` from `.env.example` if needed.
+3. Open `.env` and replace the placeholder with your key:
 
----
-
-### 📦 Pre-Install All Dependencies Only (1-Click)
-* **Windows**: Double-click **`setup.bat`**
-* **macOS / Linux**: Run **`./setup.sh`**
-
-> *Creates virtual environment, upgrades pip, installs all Python packages, and installs all React npm modules.*
-
----
-
-## 📁 Clean Directory Structure
-
-The repository is organized into distinct, modular folders:
-
-```
-ai-study-assistant/
-├── 📂 backend/               # FastAPI Backend & Core AI Logic
-│   ├── 📂 agent/            # AI Orchestrator, Prompts & Parsers
-│   ├── 📂 extractors/       # Document Parsing (PDF, DOCX, PPTX, OCR, Text)
-│   ├── 📂 services/         # AI Tutor, Flashcards, Quiz, Knowledge Map
-│   ├── config.py            # API Key & Gemini Client Configuration
-│   ├── db.py                # SQLite Database & Schema Persistence
-│   ├── server.py            # REST API Endpoints (FastAPI)
-│   └── summarizer.py        # Multimodal Summarization Logic
-├── 📂 frontend/              # Single Page Application (React 19 + Vite + Tailwind v4)
-│   ├── public/              # SVG Icons & Static Assets
-│   ├── src/                 # React UI Components, Views & API Services
-│   └── package.json         # Frontend Package Configuration
-├── 📂 tests/                 # Comprehensive Test Suite (43 Unit Tests)
-├── 📂 sample_data/           # Sample Notes for Quick Testing
-├── 📂 scripts/               # Legacy App & CLI Utility Scripts
-├── 📄 .env.example           # Template for Environment Variables
-├── 📄 .gitignore            # Git Exclusions (Secrets, Builds, DBs)
-├── 📄 requirements.txt       # Python Dependencies
-├── 🚀 run.py                 # Cross-Platform Master Launcher
-├── ⚡ setup.bat / setup.sh   # 1-Click Requirements Installer
-├── 🎮 start.bat / start.sh   # 1-Click App Launcher
-└── 📘 README.md              # Project Documentation
-```
-
----
-
-## 🛠️ Prerequisites & Setup
-
-### Prerequisites
-* **Python**: 3.10 or higher
-* **Node.js**: 18 or higher
-* **Gemini API Key**: Free key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-
----
-
-### 🔑 Environment Configuration
-
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Open `.env` and enter your Google Gemini API key:
    ```env
-   GEMINI_API_KEY=AIzaSy...Your_Actual_API_Key_Here
+   GEMINI_API_KEY=your_real_api_key
    ```
 
----
+4. Double-click `start.bat`. It starts the backend and frontend and opens the app in your browser. Keep the console window open while using StudyVerse; press Ctrl+C there to stop the servers.
 
-### 💻 Manual CLI Setup (Optional)
+On first launch, `start.bat` runs setup if the Python environment is missing and installs frontend packages if needed. If installation fails, the script reports the failure and exits instead of continuing with a broken setup.
 
-If you prefer to run services manually in separate terminals:
+## macOS and Linux
 
-#### 1. Backend (FastAPI)
+Install Python 3.10+, Node.js 18+, and npm, then run:
+
 ```bash
-# Activate virtual environment
-python -m venv .venv
-source .venv/bin/activate   # Linux/Mac
-# .venv\Scripts\activate    # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start backend server
-python -m uvicorn backend.server:app --reload --port 8000
+chmod +x setup.sh start.sh
+./setup.sh
 ```
-*Backend API docs available at: `http://localhost:8000/docs`*
 
-#### 2. Frontend (React)
+Add your Gemini key to `.env`, then launch with `./start.sh`. You can also run `python3 run.py` after dependencies are installed.
+
+## Manual setup
+
+Create and activate a virtual environment, then install backend dependencies:
+
+```bash
+python -m venv .venv
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Install and run the frontend in a second terminal:
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*Frontend app available at: `http://localhost:5173`*
 
----
+Run the backend from the project root in another terminal:
 
-## 🧪 Running Unit Tests
+```bash
+python -m uvicorn backend.server:app --reload --host 127.0.0.1 --port 8000
+```
 
-Run the complete 43-test suite with a single command:
+The web app is at <http://localhost:5173>; the API documentation is at <http://localhost:8000/docs>.
+
+## Project layout
+
+```text
+backend/          FastAPI app, AI services, document extractors, and SQLite access
+frontend/         React application and Vite configuration
+sample_data/      Small sample study note
+scripts/          Optional utilities and legacy Streamlit entry points
+tests/            Maintained Python test suite
+.env.example      Environment variable template (safe to commit)
+requirements.txt  Backend Python dependencies
+requirements-optional.txt  Optional dependencies for legacy Streamlit utilities
+run.py            Cross-platform launcher used by start.bat and start.sh
+setup.*           Dependency setup scripts
+start.*           Application launch scripts
+```
+
+Runtime files such as `.env`, the local database, uploaded documents, Python environments, and npm packages are created or kept locally and are excluded from GitHub downloads.
+
+## Features
+
+- Import PDF, DOCX, PPTX, image, and text study materials, plus supported YouTube transcripts.
+- Generate summaries in multiple styles and ask questions grounded in uploaded material.
+- Create flashcards, diagnostic quizzes, and interactive knowledge maps.
+- Store study materials and generated outputs in a local SQLite database.
+
+## Troubleshooting
+
+- **Python or npm not found:** Install Python 3.10+ and Node.js 18+, enable Python on PATH, then reopen the terminal and run `setup.bat` again.
+- **AI features report an API key error:** Confirm `.env` is in the project root and contains a valid `GEMINI_API_KEY` value. Restart the app after changing it.
+- **A port is already in use:** Stop the other process using port 8000 or 5173, then run `start.bat` again.
+- **Dependencies are incomplete:** Run `setup.bat` again. It is safe to rerun.
+
+## Tests
+
+Run the maintained Python tests from the project root:
 
 ```bash
 python -m unittest discover -s tests
 ```
 
----
+The dependencies for the legacy Streamlit utilities are optional and can be installed with `python -m pip install -r requirements-optional.txt`.
 
-## 🌟 Key Features
+## Contributing
 
-* 📄 **Multimodal Document Ingestion**: Process PDF, PPTX, DOCX, Images (with Gemini Vision OCR), and Text notes.
-* 📝 **Smart Note Summarization**: Generate Concise, Detailed, Study Guide, or Bulleted summaries with customizable focus topics.
-* 🤖 **Grounded AI Tutor**: Interactive chat trained specifically on your uploaded materials with source citations.
-* 🎴 **Interactive Flashcards**: Auto-generated Q&A flashcards with mastery tracking.
-* 🎯 **Diagnostic Quizzes**: Multiple-choice & short answer quizzes with instant grading and explanations.
-* 🕸️ **Knowledge Maps**: Interactive 2D force-directed concept graphs mapping key relationships.
-
----
-
-## 🤝 Contributing
-
-1. Create a feature branch (`git checkout -b feature/amazing-feature`)
-2. Commit your changes (`git commit -m "feat: add amazing feature"`)
-3. Push to the branch (`git push origin feature/amazing-feature`)
-4. Open a Pull Request!
+Create a feature branch, make your changes, and open a pull request with a short description of the change.

@@ -1,0 +1,2 @@
+# Optional dependencies for legacy Streamlit utilities under scripts/.
+streamlit>=1.30.0
