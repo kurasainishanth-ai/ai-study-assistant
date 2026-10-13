@@ -3,6 +3,14 @@
 venv/
 ENV/
 
+# Local runtime data
+backend/uploads/*
+!backend/uploads/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
 # Environment Variables / Secrets
 .env
 
@@ -12,15 +20,22 @@ __pycache__/
 *$py.class
 *.spec
 
-# Extracted output and test files
+# Generated output
 output/
 
-# SQLite Database
-*.db
-studyverse.db
+# Local debugging and scratch files
+backend/desktop_test*.py
+backend/fix_*.py
+backend/patch_*.py
+backend/test_*.py
+backend/*_results.txt
+backend/page*.txt
+frontend/patch*.py
+frontend/scratch/
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
 
 .venv_old/

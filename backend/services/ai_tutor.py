@@ -63,7 +63,7 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate", source
         "   - DISGUISED ENTERTAINMENT: If a request just adds 'scientifically' to a fictional debate (e.g., 'Explain Doctor Doom\\'s powers scientifically' or 'Compare Thor and Hulk scientifically'), DO NOT indulge in a lore discussion. You MUST reply ONLY with this brief redirection and STOP GENERATING: 'If you\\'d like, I can use that fictional example to teach a specific scientific concept. For example, I can explain gamma radiation, biomechanics, electromagnetism, energy, or conservation laws using them as an example.' Do not provide any scientific breakdown until the user specifies the concept.\n"
         "   - CONTEXT DRIFT: Do NOT inherit academic intent from a previous message. If a user follows an academic explanation with 'Okay, now Thor and Hulk', do not automatically generate a new scientific comparison. Instead, ask which specific scientific concept they want to explore.\n"
         "   - DO NOT FAKE SCIENCE: Clearly distinguish canon from real science. Never present invented fictional mechanisms as established science. Explicitly label speculative explanations as speculation, focusing on where fiction aligns with or violates real science.\n"
-        "5. NO HALLUCINATION OF SOURCES: Never fabricate something and claim it came from the document. Cite the exact source marker (e.g., [Page X], [Slide Y]) only when stating a fact directly from the text.\n"
+        "5. NO HALLUCINATION OF SOURCES & CITATIONS: Never fabricate something and claim it came from the document. Cite the exact source marker from the text (e.g., [Page X], [Slide Y], [Section Title], or exact timestamp like [MM:SS] for video lectures) whenever stating a fact directly from the source.\n"
         f"6. TONE & DEPTH: {level_guide}\n"
         "7. PEDAGOGY: Break complex thoughts into logical steps, provide helpful analogies, and invite thoughtful follow-ups."
     )
@@ -75,7 +75,7 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate", source
         f"{history_str}\n\n"
         f"STUDENT QUESTION:\n"
         f"{question}\n\n"
-        "TUTOR RESPONSE (Include citations like [Page X] or [Slide Y] where applicable):"
+        "TUTOR RESPONSE (Include citations like [Page X], [Slide Y], or [MM:SS] timestamp where applicable):"
     )
 
     from services.gemini_caller import call_gemini_with_retry
@@ -85,8 +85,8 @@ def ask_ai_tutor(doc_id: str, question: str, level: str = "intermediate", source
         temperature=0.3
     )
 
-    # Extract citations like [Page 1], [Slide 2], etc.
-    citations = list(set(re.findall(r"\[(?:Page|Slide|Section)\s*[^\]]+\]", answer_text, re.IGNORECASE)))
+    # Extract citations like [Page 1], [Slide 2], [01:23], etc.
+    citations = list(set(re.findall(r"\[(?:(?:Page|Slide|Section)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]", answer_text, re.IGNORECASE)))
 
     # Persist messages in SQLite
     db.save_chat_message(doc_id=doc_id, role="user", content=question, level=level)

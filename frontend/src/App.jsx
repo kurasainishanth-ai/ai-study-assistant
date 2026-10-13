@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
-  BookOpen, Brain, ChevronLeft, ChevronRight, ChevronDown, FilePlus2, GraduationCap,
+  BookOpen, Brain, ChevronLeft, ChevronRight, ChevronDown, FilePlus2,
   LayoutDashboard, LoaderCircle, MessageCircle, Plus, RefreshCw, Send,
   Sparkles, Trash2, Upload, WandSparkles, X, RotateCcw,
   CheckCircle2, XCircle, Map as MapIcon, Layers, FileText,
-  AlertTriangle, Check, ArrowLeft
+  AlertTriangle, Check, ArrowLeft, Video, Play, ExternalLink, Clock,
+  Search, Eye, EyeOff, CornerDownRight
 } from "lucide-react";
 import { api } from "./services/api";
 import ReactMarkdown from "react-markdown";
@@ -20,6 +21,245 @@ import ForceGraph2D from "react-force-graph-2d";
 
 const text = (v) => (typeof v === "string" ? v : JSON.stringify(v, null, 2));
 
+const getTimeGreeting = (date) => {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  if (hour >= 17 && hour < 22) return "Good evening";
+  return "Good night";
+};
+
+const THEMES = {
+  "Matrix Terminal": { bg: "#0d0d0d", surface: "#161616", fg: "#00ff66", muted: "#74d89a", accent: "#00ff66", border: "rgba(0,255,102,.2)" },
+  "Mocha Dark": { bg: "#1e1e2e", surface: "#181825", fg: "#cdd6f4", muted: "#a6adc8", accent: "#cba6f7", border: "rgba(255,255,255,.1)" },
+  "Tokyo Night": { bg: "#1a1b26", surface: "#24283b", fg: "#a9b1d6", muted: "#929bc5", accent: "#7aa2f7", border: "rgba(122,162,247,.2)" },
+  "Cyberpunk 2077": { bg: "#181528", surface: "#221d38", fg: "#00f0ff", muted: "#b2a9df", accent: "#ffe600", border: "rgba(0,240,255,.25)" },
+  "Serika Dark": { bg: "#323437", surface: "#2c2e31", fg: "#d1d0c5", muted: "#aaa99f", accent: "#e2b714", border: "rgba(226,183,20,.2)" },
+  "8008": { bg: "#333a42", surface: "#2b3138", fg: "#e3e6e8", muted: "#bbc0c4", accent: "#f14e6c", border: "rgba(241,78,108,.2)" },
+  "Botanical": { bg: "#1e2522", surface: "#27322c", fg: "#e1e8e3", muted: "#b5c5bb", accent: "#91b493", border: "rgba(145,180,147,.2)" },
+  "Synthwave '84": { bg: "#262335", surface: "#241b2f", fg: "#36f9f6", muted: "#bbbfe7", accent: "#fe4450", border: "rgba(254,68,80,.25)" },
+  "Horizon Sunset": { bg: "#1c1b22", surface: "#2b2a33", fg: "#fbfbfe", muted: "#c1c0cb", accent: "#ff7162", border: "rgba(255,113,98,.2)" },
+  "Olivia Luxe": { bg: "#1c1b1b", surface: "#262424", fg: "#f2efed", muted: "#c4bcb6", accent: "#deaf9d", border: "rgba(222,175,157,.2)" },
+  "Carbon Minimal": { bg: "#161616", surface: "#262626", fg: "#f4f4f4", muted: "#c0c0c0", accent: "#ffffff", border: "rgba(255,255,255,.15)" },
+  "Paper Light": { bg: "#f7f7f9", surface: "#ffffff", fg: "#1e1e2e", muted: "#6c6f85", accent: "#d20f39", border: "rgba(0,0,0,.1)" },
+  "Spider-Man (Classic Hero Comic)": { bg: "#081426", surface: "#12243D", glass: "rgba(18, 36, 61, 0.78)", fg: "#F7FAFF", muted: "#C7D5E8", accent: "#EF233C", glow: "rgba(239, 35, 60, 0.32)", secondary: "#2563EB", highlight: "#FFD84D", border: "rgba(125, 174, 255, 0.24)" },
+  "Ben 10 (Omnitrix Cyber Alien)": { bg: "#121212", surface: "#0B3818", fg: "#FFFFFF", muted: "#d2d8d3", accent: "#00FF41", secondary: "#0B3818", highlight: "#9E9E9E", border: "rgba(158,158,158,.35)" },
+};
+
+const applyTheme = (name) => {
+  const t = THEMES[name] || THEMES["Matrix Terminal"];
+  const root = document.documentElement;
+  const hex = t.accent.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const channel = (value) => {
+    const normalized = value / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  const accentLuminance = 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+  const contrast = (luminance) => (Math.max(accentLuminance, luminance) + 0.05) / (Math.min(accentLuminance, luminance) + 0.05);
+  const accentText = contrast(0.014) >= contrast(1) ? "#20212a" : "#ffffff";
+  const luminanceOf = (color) => {
+    const values = color.replace("#", "").match(/.{2}/g).map((part) => channel(parseInt(part, 16)));
+    return 0.2126 * values[0] + 0.7152 * values[1] + 0.0722 * values[2];
+  };
+  const backgroundLuminance = luminanceOf(t.bg);
+  const ensureReadable = (color, background, minimum = 4.5) => {
+    const original = color.replace("#", "").match(/.{2}/g).map((part) => parseInt(part, 16));
+    const target = backgroundLuminance > 0.45 ? 0 : 255;
+    for (let step = 0; step <= 100; step += 1) {
+      const amount = step / 100;
+      const candidate = original.map((value) => Math.round(value + (target - value) * amount));
+      const result = `#${candidate.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+      const l = luminanceOf(result);
+      const bg = luminanceOf(background);
+      if ((Math.max(l, bg) + 0.05) / (Math.min(l, bg) + 0.05) >= minimum) return result;
+    }
+    return color;
+  };
+  const readableMuted = ensureReadable(ensureReadable(t.muted, t.bg), t.surface);
+  const dangerReadable = ensureReadable("#ef4444", t.bg);
+  const readableIcon = ensureReadable(t.accent, t.surface, 3);
+  const readableHighlight = ensureReadable(t.highlight || t.accent, t.surface, 3);
+  const vars = {
+    "--bg": t.bg, "--surface": t.surface,
+    "--surface-2": `color-mix(in srgb, ${t.surface} 78%, ${t.fg})`,
+    "--surface-3": `color-mix(in srgb, ${t.surface} 88%, ${t.accent})`,
+    "--glass-bg": t.glass || `color-mix(in srgb, ${t.surface} 78%, transparent)`,
+    "--glass-border": t.border,
+    "--accent-glow": t.glow || `color-mix(in srgb, ${t.accent} 38%, transparent)`,
+    "--border": t.border, "--border-l": t.border,
+    "--fg": t.fg, "--fg-2": readableMuted,
+    "--fg-3": readableMuted,
+    "--fg-muted": readableMuted, "--accent": t.accent, "--accent-fg": accentText,
+    "--danger-readable": dangerReadable, "--icon": readableIcon, "--highlight": readableHighlight,
+    "--green": t.secondary || t.surface, "--green-l": `color-mix(in srgb, ${t.secondary || t.surface} 76%, ${t.accent})`,
+    "--green-fg": t.fg, "--success": "#10b981", "--danger": "#d04735",
+    "--danger-bg": "#f8dfd7", "--danger-fg": "#7d3829", "--purple": t.accent,
+  };
+  Object.entries(vars).forEach(([key, value]) => root.style.setProperty(key, value));
+  root.dataset.theme = name;
+
+  const favicon = document.getElementById("app-favicon");
+  if (favicon) {
+    const iconColor = readableIcon;
+    const sparkColor = readableHighlight;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="${t.bg}"/><g fill="none" stroke="${iconColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M13 25c6-2.7 12.4-1.8 19 2.6V49c-6.6-4.4-13-5.3-19-2.6V25Z"/><path d="M51 25c-6-2.7-12.4-1.8-19 2.6V49c6.6-4.4 13-5.3 19-2.6V25Z"/><path d="M32 27.5V49"/><path d="m46 11 2.1 5.9L54 19l-5.9 2.1L46 27l-2.1-5.9L38 19l5.9-2.1L46 11Z" fill="${sparkColor}" stroke="${sparkColor}" stroke-width="1.5"/></g><circle cx="17" cy="17" r="1.8" fill="${iconColor}"/><circle cx="54" cy="37" r="1.8" fill="${iconColor}"/></svg>`;
+    favicon.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  }
+};
+
+function ThemePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef(null);
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event) => {
+      if (!pickerRef.current?.contains(event.target)) setOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
+  return (
+    <div className="theme-picker-wrap" ref={pickerRef}>
+      <button
+        id="theme-picker"
+        type="button"
+        className="theme-picker"
+        aria-label="Select color palette"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
+      >
+        <span className="theme-picker-swatch" aria-hidden="true" />
+        <span className="theme-picker-value">{value}</span>
+        <ChevronDown size={15} className={open ? "theme-picker-chevron is-open" : "theme-picker-chevron"} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="theme-picker-menu" role="listbox" aria-label="Color palettes">
+          {Object.keys(THEMES).map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="option"
+              aria-selected={value === name}
+              className={`theme-picker-option${value === name ? " is-selected" : ""}`}
+              onClick={() => { onChange(name); setOpen(false); }}
+            >
+              <span className="theme-picker-option-dot" aria-hidden="true" />
+              <span>{name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudyLaneMark({ className = "" }) {
+  return (
+    <svg className={className} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <path d="M13 25c6-2.7 12.4-1.8 19 2.6V49c-6.6-4.4-13-5.3-19-2.6V25Z" />
+      <path d="M51 25c-6-2.7-12.4-1.8-19 2.6V49c6.6-4.4 13-5.3 19-2.6V25Z" />
+      <path d="M32 27.5V49" />
+      <path className="emblem-spark" d="m46 11 2.1 5.9L54 19l-5.9 2.1L46 27l-2.1-5.9L38 19l5.9-2.1L46 11Z" />
+      <circle cx="17" cy="17" r="1.5" />
+      <circle cx="54" cy="37" r="1.5" />
+    </svg>
+  );
+}
+
+const extractYoutubeId = (urlOrId) => {
+  if (!urlOrId) return null;
+  const match = urlOrId.match(/(?:v=|\/vi\/|embed\/|shorts\/|youtu\.be\/|\/v\/)([0-9A-Za-z_-]{11})/);
+  if (match) return match[1];
+  if (/^[0-9A-Za-z_-]{11}$/.test(urlOrId.trim())) return urlOrId.trim();
+  return null;
+};
+
+const parseTimestampSeconds = (tsStr) => {
+  if (!tsStr) return 0;
+  const match = tsStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return 0;
+  if (match[3] !== undefined) {
+    return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]);
+  }
+  return parseInt(match[1]) * 60 + parseInt(match[2]);
+};
+
+const parseCitationInfo = (citStr) => {
+  if (!citStr) return null;
+  const s = String(citStr).trim();
+  const tsMatch = s.match(/(?:\[)?(\d{1,2}:\d{2}(?::\d{2})?)(?:\])?/);
+  if (tsMatch) {
+    return {
+      type: "timestamp",
+      raw: s,
+      seconds: parseTimestampSeconds(tsMatch[1]),
+      label: tsMatch[1]
+    };
+  }
+  const pageMatch = s.match(/(?:Page|p\.?)\s*(\d+)/i);
+  if (pageMatch) {
+    return {
+      type: "page",
+      raw: s,
+      target: parseInt(pageMatch[1], 10),
+      label: `Page ${pageMatch[1]}`
+    };
+  }
+  const slideMatch = s.match(/(?:Slide|s\.?)\s*(\d+)/i);
+  if (slideMatch) {
+    return {
+      type: "slide",
+      raw: s,
+      target: parseInt(slideMatch[1], 10),
+      label: `Slide ${slideMatch[1]}`
+    };
+  }
+  const secMatch = s.match(/(?:Section|Sec\.?|Part|Paragraph)\s*([0-9A-Za-z.-]+)/i);
+  if (secMatch) {
+    return {
+      type: "section",
+      raw: s,
+      target: secMatch[1],
+      label: `Section ${secMatch[1]}`
+    };
+  }
+  return {
+    type: "general",
+    raw: s,
+    target: s.replace(/^\[|\]$/g, "").trim(),
+    label: s.replace(/^\[|\]$/g, "").trim()
+  };
+};
+
+function DynamicCitation({ citation, onClick, isActive, disabled = false }) {
+  const info = parseCitationInfo(citation);
+  if (!info) return null;
+
+  const isTs = info.type === "timestamp";
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      className={`citation-pill ${isTs ? "timestamp-pill" : ""} ${isActive ? "active-target" : ""}`}
+      onClick={() => onClick && onClick(info)}
+      title={disabled ? "Reference preview is available after submitting the quiz" : isTs ? `Jump to video at ${info.label}` : `Jump to ${info.label} in Document Preview`}
+    >
+      {isTs ? <Play size={10} fill="#ef4444" /> : <BookOpen size={10} />}
+      <span>{info.label || info.raw}</span>
+    </button>
+  );
+}
+
 const Md = ({ children }) => (
   <div className="md-body">
     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
@@ -32,23 +272,47 @@ const Md = ({ children }) => (
 /*  Feature Renderers                                                  */
 /* ------------------------------------------------------------------ */
 
-function NotesRenderer({ data }) {
+function NotesRenderer({ data, onCitationClick }) {
   if (!data) return null;
   const list = Array.isArray(data) ? data : [data];
   if (!list.length || (!list[0]?.content && typeof list[0] !== "string")) return null;
   return (
     <div className="render-notes">
-      {list.map((n, i) => (
-        <article key={i} className="note-card">
-          <h4>{n.style_title || "Study Notes"}</h4>
-          <Md>{typeof n === "string" ? n : n.content}</Md>
-        </article>
-      ))}
+      {list.map((n, i) => {
+        const contentStr = typeof n === "string" ? n : n.content;
+        const citList = Array.from(new Set(
+          contentStr.match(/(?:\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]|\b(?:Page|Slide)\s+\d+\b)/gi) || []
+        ));
+        return (
+          <article key={i} className="note-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+              <h4 style={{ margin: 0 }}>{n.style_title || "Study Notes"}</h4>
+              {citList.length > 0 && onCitationClick && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end" }}>
+                  <small style={{ fontSize: 11, color: "var(--fg-3)", fontWeight: 600 }}>Citations:</small>
+                  {citList.slice(0, 6).map((cit, ci) => (
+                    <DynamicCitation key={ci} citation={cit} onClick={onCitationClick} />
+                  ))}
+                </div>
+              )}
+            </div>
+            <Md>{contentStr}</Md>
+            {citList.length > 0 && onCitationClick && (
+              <div style={{ marginTop: 18, paddingTop: 12, borderTop: "1px dashed var(--border)", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                <small style={{ fontSize: 11, color: "var(--fg-3)", fontWeight: 600 }}>All Referenced Sources:</small>
+                {citList.map((cit, ci) => (
+                  <DynamicCitation key={ci} citation={cit} onClick={onCitationClick} />
+                ))}
+              </div>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }
 
-function FlashcardsRenderer({ data, onReview, onResetMode }) {
+function FlashcardsRenderer({ data, onReview, onResetMode, onCitationClick }) {
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
@@ -159,7 +423,14 @@ function FlashcardsRenderer({ data, onReview, onResetMode }) {
       <div className={`flip-card${flipped ? " flipped" : ""}`} onClick={() => setFlipped(!flipped)}>
         <div className="flip-inner">
           <div className="flip-front"><Md>{c.question || c.front || ""}</Md></div>
-          <div className="flip-back"><Md>{c.answer || c.back || ""}</Md></div>
+          <div className="flip-back">
+            <Md>{c.answer || c.back || ""}</Md>
+            {c.source_ref && (
+              <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
+                <DynamicCitation citation={c.source_ref} onClick={onCitationClick} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>Click card to flip</p>
@@ -191,7 +462,7 @@ function FlashcardsRenderer({ data, onReview, onResetMode }) {
   );
 }
 
-function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
+function QuizRenderer({ data, runSubmit, submitting, onResetMode, onCitationClick, citationsEnabled = true }) {
   const [answers, setAnswers] = useState({});
   const [retryMode, setRetryMode] = useState(false);
   
@@ -215,7 +486,12 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
         <div className="quiz-details-list">
           {a.evaluations?.map((d, i) => (
             <div key={i} className={`quiz-detail ${d.is_correct ? "correct" : "wrong"}`}>
-              <b>{i + 1}. {d.question}</b>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                <b>{i + 1}. {d.question}</b>
+                {d.source_ref && (
+                  <DynamicCitation citation={d.source_ref} onClick={onCitationClick} disabled={!citationsEnabled} />
+                )}
+              </div>
               <div className="qd-answers">
                 <p className="muted">Your answer: {d.student_answer}</p>
                 {!d.is_correct && <p className="correct-answer">Answer Key: {d.correct_answer}</p>}
@@ -250,7 +526,8 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
     qs = data[0].evaluations.map(ev => ({
       id: ev.id,
       question: ev.question,
-      options: ev.options || null // If options got lost, it'll fallback to descriptive
+      options: ev.options || null,
+      source_ref: ev.source_ref || null
     }));
   } else {
     qs = data?.questions || (Array.isArray(data) ? data : []);
@@ -262,7 +539,12 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode }) {
     <div className="render-quiz">
       {qs.map((q, i) => (
         <div key={i} className="quiz-q">
-          <b>{i + 1}. {q.question}</b>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+            <b>{i + 1}. {q.question}</b>
+            {q.source_ref && (
+              <DynamicCitation citation={q.source_ref} onClick={onCitationClick} disabled={!citationsEnabled} />
+            )}
+          </div>
           {q.options && q.options.length > 0 ? (
             <div className="quiz-options">
               {q.options.map((opt, j) => (
@@ -572,6 +854,12 @@ function SourceSelectDropdown({ materials, selectedSourceIds, onToggleSource, on
 
 export default function App() {
   const [view, setView] = useState("home");
+  const [greetingTime, setGreetingTime] = useState(() => new Date());
+  const [themeName, setThemeName] = useState(() =>
+    typeof window !== "undefined" && THEMES[window.localStorage.getItem("studyverse-theme")]
+      ? window.localStorage.getItem("studyverse-theme")
+      : "Matrix Terminal"
+  );
   const [materials, setMaterials] = useState([]);
   const [chats, setChats] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -581,9 +869,20 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [showUpload, setShowUpload] = useState(false);
   const [cache, setCache] = useState({});          // keyed "docId_toolId"
+  const [activeVideoModal, setActiveVideoModal] = useState(null); // { material, seconds }
   const [progressData, setProgressData] = useState(null);
   const [progressLoading, setProgressLoading] = useState(true);
   const fileRef = useRef(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setGreetingTime(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    applyTheme(themeName);
+    window.localStorage.setItem("studyverse-theme", themeName);
+  }, [themeName]);
 
   const refresh = useCallback(async () => {
     try {
@@ -623,8 +922,6 @@ export default function App() {
   };
 
   const onDeleteSource = async (id) => {
-    const mat = materials.find((m) => m.id === id);
-    if (mat && !confirm(`Remove '${mat.name}' from your library?`)) return;
     try {
       await api.remove(id);
       setSelectedSourceIds((prev) => prev.filter((x) => x !== id));
@@ -694,6 +991,41 @@ export default function App() {
     finally { setBusy(false); }
   };
 
+  const ingestYoutube = async (url) => {
+    setBusy(true);
+    try {
+      const res = await api.ingestYoutube(url);
+      await refresh();
+      setShowUpload(false);
+      if (res && res.material) {
+        setSelected(res.material);
+        setSelectedSourceIds([res.material.id]);
+      }
+      setView("library");
+    } catch (e) {
+      setNotice(e.message);
+      throw e;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCitationClick = (citationText) => {
+    const seconds = parseTimestampSeconds(citationText);
+    let targetMat = null;
+    if (selected && !selected.is_chat) {
+      targetMat = selected;
+    } else if (selected?.source_doc_id) {
+      targetMat = materials.find((m) => m.id === selected.source_doc_id);
+    }
+    if (!targetMat || (!targetMat.metadata?.youtube_id && !targetMat.source_url)) {
+      targetMat = materials.find((m) => m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url);
+    }
+    if (targetMat) {
+      setActiveVideoModal({ material: targetMat, seconds });
+    }
+  };
+
   const handleNavClick = (id) => {
     if (id === "tutor") {
       // Always open a fresh/new chat interface by default when clicking AI Tutor nav item
@@ -726,13 +1058,16 @@ export default function App() {
   return (
     <div className="shell">
       <aside>
-        <div className="brand"><i><GraduationCap size={20} /></i>studylane</div>
+        <div className="brand"><i><StudyLaneMark className="sidebar-study-mark" /></i>studylane</div>
         <small className="label">YOUR WORKSPACE</small>
         {NAV.map(([id, Icon, label]) => (
           <button key={id} className={`nav${view === id ? " on" : ""}`} onClick={() => handleNavClick(id)}>
             <Icon size={17} />{label}
           </button>
         ))}
+
+        <label className="theme-picker-label" htmlFor="theme-picker">🎨 COLOR PALETTE</label>
+        <ThemePicker value={themeName} onChange={setThemeName} />
         
         <div style={{marginTop: '20px', marginBottom: '10px'}}>
           <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px', marginBottom: '6px'}}>
@@ -826,13 +1161,25 @@ export default function App() {
         <header>
           <div>
             <small className="label">{view === "home" ? "A CALM PLACE TO LEARN" : view.toUpperCase()}</small>
-            <h1>{view === "home" ? "Good afternoon." : view === "library" ? "Your Library" : view === "studio" ? "Study Studio" : "Your AI Tutor"}</h1>
+            <h1>{view === "home" ? `${getTimeGreeting(greetingTime)}.` : view === "library" ? "Your Library" : view === "studio" ? "Study Studio" : "Your AI Tutor"}</h1>
           </div>
-          <b className="avatar">KS</b>
+          <div className="header-emblem" role="img" aria-label="StudyLane learning emblem" title="StudyLane">
+            <StudyLaneMark />
+          </div>
         </header>
         {notice && <div className="notice">{notice}<button className="btn-icon" onClick={() => setNotice("")}><X size={16} /></button></div>}
         {view === "home" && <Home materials={materials} selected={selected} choose={setSelected} go={setView} upload={() => setShowUpload(true)} progressData={progressData} progressLoading={progressLoading} />}
-        {view === "library" && <Library materials={materials} selected={selected} choose={setSelected} refresh={refresh} warn={setNotice} upload={() => setShowUpload(true)} />}
+        {view === "library" && (
+          <Library
+            materials={materials}
+            selected={selected}
+            choose={setSelected}
+            refresh={refresh}
+            warn={setNotice}
+            upload={() => setShowUpload(true)}
+            onOpenVideo={(mat) => setActiveVideoModal({ material: mat, seconds: 0 })}
+          />
+        )}
         {view === "studio" && (
           <Studio
             selected={selected}
@@ -847,6 +1194,7 @@ export default function App() {
             onSelectAllSources={onSelectAllSources}
             onDeleteSource={onDeleteSource}
             refresh={refresh}
+            onOpenVideo={(mat, secs) => setActiveVideoModal({ material: mat, seconds: secs || 0 })}
           />
         )}
         {view === "tutor" && (
@@ -859,11 +1207,41 @@ export default function App() {
             onToggleSource={onToggleSource}
             onSelectAllSources={onSelectAllSources}
             onDeleteSource={onDeleteSource}
+            onOpenVideo={(mat, secs) => setActiveVideoModal({ material: mat, seconds: secs || 0 })}
           />
         )}
       </main>
 
-      {showUpload && <UploadModal busy={busy} close={() => setShowUpload(false)} choose={() => fileRef.current.click()} sample={async () => { setBusy(true); try { await api.sample(); await refresh(); setShowUpload(false); setView("library"); } catch (e) { setNotice(e.message); } finally { setBusy(false); } }} />}
+      {showUpload && (
+        <UploadModal
+          busy={busy}
+          close={() => setShowUpload(false)}
+          choose={() => fileRef.current.click()}
+          sample={async () => {
+            setBusy(true);
+            try {
+              await api.sample();
+              await refresh();
+              setShowUpload(false);
+              setView("library");
+            } catch (e) {
+              setNotice(e.message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+          onIngestYoutube={ingestYoutube}
+        />
+      )}
+
+      {activeVideoModal && (
+        <VideoPlayerModal
+          material={activeVideoModal.material}
+          initialSeconds={activeVideoModal.seconds || 0}
+          onClose={() => setActiveVideoModal(null)}
+        />
+      )}
+
       <input className="hidden" ref={fileRef} type="file" onChange={(e) => upload(e.target.files?.[0])} />
     </div>
   );
@@ -875,7 +1253,7 @@ export default function App() {
 
 function Home({ materials, selected, choose, go, upload, progressData, progressLoading }) {
   return (
-    <section className="page">
+    <section className="page overview-page">
       <div className="hero">
         <div>
           <small className="pill"><Sparkles size={13} /> YOUR PERSONAL LEARNING SPACE</small>
@@ -886,10 +1264,9 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
             <button className="btn-link" onClick={() => go("studio")}>Open Study Studio <ChevronRight size={17} /></button>
           </div>
         </div>
-        <div className="orb-wrap">
-          <div className="orb" />
-          <span>Ready when you are</span>
-          <b>{materials.length} materials in your lane</b>
+        <div className="overview-side">
+          <OverviewClock />
+          <div className="overview-material-count"><FileText size={15} />{materials.length} {materials.length === 1 ? "material" : "materials"} ready to study</div>
         </div>
       </div>
 
@@ -902,13 +1279,13 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
             {/* Overall Stats Card */}
-            <div style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <div className="overview-stat-card" style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)' }}>
               <small className="label" style={{ marginBottom: '0.5rem', display: 'block' }}>OVERALL ACTIVITY</small>
               <h3 style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>{progressData.total_quizzes} Quizzes Taken</h3>
               <p style={{ color: 'var(--fg-2)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Average Score: {progressData.average_quiz_score}%</p>
               
               {progressData.recommended_activity && (
-                <div style={{ padding: '1rem', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--accent)' }}>
+                <div className="overview-recommendation" style={{ padding: '1rem', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--accent)' }}>
                   <b style={{ color: 'var(--accent)', fontSize: '0.95rem', display: 'block', marginBottom: '0.25rem' }}>{progressData.recommended_activity.activity}</b>
                   <small style={{ color: 'var(--fg-2)', lineHeight: 1.4, display: 'block' }}>{progressData.recommended_activity.reason}</small>
                 </div>
@@ -916,7 +1293,7 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
             </div>
             
             {/* Topic Mastery Card */}
-            <div style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
+            <div className="overview-mastery-card" style={{ padding: '1.5rem', background: 'var(--surface-2)', borderRadius: '12px', border: '1px solid var(--border)', gridColumn: 'span 2' }}>
               <small className="label" style={{ marginBottom: '1rem', display: 'block' }}>TOPIC MASTERY</small>
               {Object.keys(progressData.topic_mastery || {}).length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -961,12 +1338,32 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
         <div className="grid">
           {materials.slice(0, 3).map((m) => (
             <button key={m.id} className={`material${selected?.id === m.id ? " selected" : ""}`} onClick={() => choose(m)}>
-              <FileIcon /><span><b>{m.name}</b><small>{m.type} {m.size_kb} KB</small></span><ChevronRight size={17} />
+              <FileIcon type={m.type} /><span><b>{m.name}</b><small>{m.type} · {m.size_kb} KB</small></span><ChevronRight size={17} />
             </button>
           ))}
         </div>
       ) : <EmptyState upload={upload} />}
     </section>
+  );
+}
+
+function OverviewClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="overview-widget clock-widget">
+      <div className="overview-widget-label"><Clock size={15} /> LOCAL TIME</div>
+      <time className="overview-clock-time" dateTime={now.toISOString()}>
+        {new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(now)}
+      </time>
+      <div className="overview-clock-date">
+        {new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" }).format(now)}
+      </div>
+    </div>
   );
 }
 
@@ -978,7 +1375,16 @@ function SectionTitle({ title, action }) {
     </div>
   );
 }
-function FileIcon() { return <i className="file"><BookOpen size={19} /></i>; }
+function FileIcon({ type }) {
+  if (type === "YouTube Lecture" || type === "Video Lecture") {
+    return (
+      <i className="file video" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+        <Video size={19} />
+      </i>
+    );
+  }
+  return <i className="file"><BookOpen size={19} /></i>;
+}
 function EmptyState({ upload }) {
   return (
     <div className="empty">
@@ -993,9 +1399,8 @@ function EmptyState({ upload }) {
 /*  Library                                                            */
 /* ------------------------------------------------------------------ */
 
-function Library({ materials, selected, choose, refresh, warn, upload }) {
+function Library({ materials, selected, choose, refresh, warn, upload, onOpenVideo }) {
   const remove = async (m) => {
-    if (!confirm("Remove '" + m.name + "' and its generated study work?")) return;
     try { await api.remove(m.id); await refresh(); } catch (e) { warn(e.message); }
   };
   return (
@@ -1006,15 +1411,45 @@ function Library({ materials, selected, choose, refresh, warn, upload }) {
       </div>
       {materials.length ? (
         <div className="list">
-          {materials.map((m) => (
-            <article key={m.id} onClick={() => choose(m)} className={selected?.id === m.id ? "selected" : ""}>
-              <FileIcon />
-              <span className="name"><b>{m.name}</b><small>{m.type} · uploaded {m.upload_time}</small></span>
-              <i className={`status ${m.status?.toLowerCase()}`}>{m.status}</i>
-              <small className="size">{m.size_kb} KB</small>
-              <button className="btn-icon-danger" onClick={(e) => { e.stopPropagation(); remove(m); }}><Trash2 size={17} /></button>
-            </article>
-          ))}
+          {materials.map((m) => {
+            const isYt = m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url?.includes("youtube") || m.source_url?.includes("youtu.be");
+            return (
+              <article key={m.id} onClick={() => choose(m)} className={selected?.id === m.id ? "selected" : ""}>
+                <FileIcon type={m.type} />
+                <span className="name">
+                  <b>{m.name}</b>
+                  <small>{m.type} · uploaded {m.upload_time}</small>
+                </span>
+                {isYt && (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      color: '#ef4444',
+                      fontSize: 12,
+                      padding: '4px 10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      borderRadius: 6,
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      background: 'rgba(239, 68, 68, 0.08)'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenVideo && onOpenVideo(m);
+                    }}
+                    title="Watch video & view timestamped transcript"
+                  >
+                    <Play size={12} fill="#ef4444" /> Watch & Transcripts
+                  </button>
+                )}
+                <i className={`status ${m.status?.toLowerCase()}`}>{m.status}</i>
+                <small className="size">{m.size_kb} KB</small>
+                <button className="btn-icon-danger" onClick={(e) => { e.stopPropagation(); remove(m); }}><Trash2 size={17} /></button>
+              </article>
+            );
+          })}
         </div>
       ) : <EmptyState upload={upload} />}
     </section>
@@ -1037,12 +1472,15 @@ function Studio({
   onToggleSource,
   onSelectAllSources,
   onDeleteSource,
-  refresh
+  refresh,
+  onOpenVideo
 }) {
   const [mode, setMode] = useState(null); // Null = Landing Overview
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
+  const [showPreview, setShowPreview] = useState(true);
+  const [targetCitation, setTargetCitation] = useState(null);
 
   const activeDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
   const activeMaterial = (materials || []).find((m) => m.id === activeDocId) || (!selected?.is_chat ? selected : null);
@@ -1051,6 +1489,8 @@ function Studio({
   const ToolIcon = tool?.icon;
   const ck = activeDocId && mode ? `${activeDocId}_${mode}` : null;
   const result = ck ? cache[ck] ?? undefined : undefined;
+  const quizSubmitted = mode === "quiz" && Array.isArray(result) && result.length > 0 && result[0]?.score !== undefined;
+  const previewVisible = showPreview && (mode !== "quiz" || quizSubmitted);
 
   /* Auto-restore from DB on first mount for this doc+tool */
   useEffect(() => {
@@ -1098,6 +1538,19 @@ function Studio({
     if (confirm("Regenerate? This replaces the current result.")) generate();
   };
 
+  const handleCitationClick = (citationObj) => {
+    const cit = typeof citationObj === "string" ? parseCitationInfo(citationObj) : citationObj;
+    if (!cit) return;
+    if (cit.type === "timestamp") {
+      if (onOpenVideo && activeMaterial) {
+        onOpenVideo(activeMaterial, cit.seconds);
+      }
+    } else {
+      setShowPreview(true);
+      setTargetCitation(cit);
+    }
+  };
+
   const reviewCard = async (cardId, rating) => {
     try { 
       await api.reviewCard(cardId, rating); 
@@ -1131,7 +1584,7 @@ function Studio({
           <ArrowLeft size={16} /> Back
         </button>
       )}
-      <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
+      <Brain size={18} style={{color: 'var(--icon)', flexShrink: 0}} />
       <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>ACTIVE SOURCE MATERIAL</small>
       
       <SourceSelectDropdown
@@ -1141,13 +1594,25 @@ function Studio({
         onSelectAll={onSelectAllSources}
         onDeleteSource={onDeleteSource}
       />
+
+      {mode && activeMaterial && (mode !== "quiz" || quizSubmitted) && (
+        <button
+          className={`preview-toggle-btn ${previewVisible ? "active" : ""}`}
+          onClick={() => setShowPreview(!showPreview)}
+          style={{ marginLeft: "auto" }}
+          title={previewVisible ? "Hide Reference Preview" : "Show Reference Preview"}
+        >
+          {previewVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+          <span>{previewVisible ? "Hide Reference Preview" : "Show Reference Preview"}</span>
+        </button>
+      )}
     </div>
   );
 
   // Render Landing Page
   if (!mode) {
     return (
-      <section className="page studio-landing">
+      <section className="page studio-page studio-landing">
         {renderSourcePicker()}
         <div className="landing-hero" style={{textAlign:'center', padding: '60px 20px'}}>
           <WandSparkles size={48} style={{color:'var(--accent)', marginBottom: 20}} />
@@ -1157,6 +1622,15 @@ function Studio({
               ? `Select a tool below to generate study material from "${activeMaterial.name}".`
               : "Please select or upload a material in your Library first."}
           </p>
+          <div className="studio-marquee" aria-label="Study tools: Smart Notes, Flashcards, Practice Quiz, Knowledge Map">
+            <div className="studio-marquee-track" aria-hidden="true">
+              {[0, 1].map((copy) => (
+                <span className="studio-marquee-set" key={copy}>
+                  <b>✳ SMART NOTES</b><i>✦</i><b>↻ FLASHCARDS</b><i>✦</i><b>✓ PRACTICE QUIZ</b><i>✦</i><b>⌘ KNOWLEDGE MAP</b><i>✦</i>
+                </span>
+              ))}
+            </div>
+          </div>
           <div className="tool-grid" style={{display:'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 20, maxWidth: 900, margin: '0 auto'}}>
             {TOOLS.map(t => {
               const TIcon = t.icon;
@@ -1166,9 +1640,9 @@ function Studio({
                   className="tool-card"
                   disabled={!activeDocId}
                   onClick={() => setMode(t.id)}
-                  style={{background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-lg)', textAlign: 'left', transition: 'border-color 0.2s, transform 0.1s', cursor: activeDocId ? 'pointer' : 'not-allowed', opacity: activeDocId ? 1 : 0.6}}
+                  style={{background: 'var(--surface)', border: '1px solid var(--border)', padding: '24px', borderRadius: 'var(--radius-lg)', textAlign: 'left', transition: 'border-color 0.2s, transform 0.1s', cursor: activeDocId ? 'pointer' : 'not-allowed'}}
                 >
-                  <TIcon size={24} style={{color: 'var(--green)', marginBottom: 16}} />
+                  <TIcon size={24} strokeWidth={2.2} style={{color: 'var(--icon)', marginBottom: 16}} />
                   <h3 style={{fontSize: 16, margin: '0 0 8px'}}>{t.label}</h3>
                   <p style={{fontSize: 13, color: 'var(--fg-3)', margin: 0, lineHeight: 1.5}}>{t.desc}</p>
                 </button>
@@ -1183,44 +1657,55 @@ function Studio({
     );
   }
 
-  // Render specific tool
+  // Render specific tool with split preview layout
   return (
-    <section className="page">
-      {renderSourcePicker()}
+    <section className={`page studio-page ${previewVisible ? "preview-split-layout full-width" : ""}`}>
+      <div className={previewVisible ? "preview-split-main" : ""}>
+        {renderSourcePicker()}
 
-      <div className="studio tool-active-layout" style={{display: 'block', padding: '40px 60px'}}>
-        <div className="work" style={{maxWidth: '100%', padding: 0}}>
-          <div style={{display:'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
-            <div>
-              <small className="label" style={{margin: '0 0 10px'}}>STUDY STUDIO</small>
-              <h2 style={{margin: 0, display:'flex', alignItems:'center', gap: 10}}><ToolIcon size={28} />{tool.label}</h2>
-              <p>{tool.desc}</p>
+        <div className="studio tool-active-layout" style={{display: 'block', padding: '36px 40px'}}>
+          <div className="work" style={{maxWidth: '100%', padding: 0}}>
+            <div style={{display:'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+              <div>
+                <small className="label" style={{margin: '0 0 10px'}}>STUDY STUDIO</small>
+                <h2 style={{margin: 0, display:'flex', alignItems:'center', gap: 10}}><ToolIcon size={28} />{tool.label}</h2>
+                <p>{tool.desc}</p>
+              </div>
+              <div className="work-actions">
+                {!hasResult && (
+                  <button className="btn-primary" disabled={!activeDocId || busy} onClick={generate}>
+                    {busy ? <><LoaderCircle className="spin" size={16} /> Generating…</> : <><WandSparkles size={16} /> Create {tool.label.toLowerCase()}</>}
+                  </button>
+                )}
+                {hasResult && (
+                  <button className="btn-secondary" disabled={busy} onClick={regenerate}>
+                    {busy ? <><LoaderCircle className="spin" size={15} /> Regenerating…</> : <><RefreshCw size={15} /> Regenerate</>}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="work-actions">
-              {!hasResult && (
-                <button className="btn-primary" disabled={!activeDocId || busy} onClick={generate}>
-                  {busy ? <><LoaderCircle className="spin" size={16} /> Generating…</> : <><WandSparkles size={16} /> Create {tool.label.toLowerCase()}</>}
-                </button>
-              )}
-              {hasResult && (
-                <button className="btn-secondary" disabled={busy} onClick={regenerate}>
-                  {busy ? <><LoaderCircle className="spin" size={15} /> Regenerating…</> : <><RefreshCw size={15} /> Regenerate</>}
-                </button>
-              )}
+
+            {error && <div className="error-box"><XCircle size={15} /> {error}</div>}
+
+            <div className="render-area" style={{marginTop: 30}}>
+              {busy && !hasResult && <div className="loader-block"><LoaderCircle className="spin" size={28} /><p>Generating your study materials…</p></div>}
+              {mode === "notes" && <NotesRenderer data={result} onCitationClick={handleCitationClick} />}
+              {mode === "cards" && <FlashcardsRenderer data={result} onReview={reviewCard} onResetMode={() => setMode(null)} onCitationClick={handleCitationClick} />}
+              {mode === "quiz" && <QuizRenderer data={result} runSubmit={submitQuiz} submitting={busy} onResetMode={() => setMode(null)} onCitationClick={handleCitationClick} citationsEnabled={quizSubmitted} />}
+              {mode === "map" && <MapRenderer data={result} />}
             </div>
-          </div>
-
-          {error && <div className="error-box"><XCircle size={15} /> {error}</div>}
-
-          <div className="render-area" style={{marginTop: 30}}>
-            {busy && !hasResult && <div className="loader-block"><LoaderCircle className="spin" size={28} /><p>Generating your study materials…</p></div>}
-            {mode === "notes" && <NotesRenderer data={result} />}
-            {mode === "cards" && <FlashcardsRenderer data={result} onReview={reviewCard} onResetMode={() => setMode(null)} />}
-            {mode === "quiz" && <QuizRenderer data={result} runSubmit={submitQuiz} submitting={busy} onResetMode={() => setMode(null)} />}
-            {mode === "map" && <MapRenderer data={result} />}
           </div>
         </div>
       </div>
+
+      {previewVisible && activeMaterial && (
+        <DocumentPreviewPanel
+          material={activeMaterial}
+          targetCitation={targetCitation}
+          onClose={() => setShowPreview(false)}
+          onOpenVideo={onOpenVideo}
+        />
+      )}
     </section>
   );
 }
@@ -1237,20 +1722,31 @@ function Tutor({
   selectedSourceIds,
   onToggleSource,
   onSelectAllSources,
-  onDeleteSource
+  onDeleteSource,
+  onOpenVideo
 }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
+  const [targetCitation, setTargetCitation] = useState(null);
   const scrollRef = useRef(null);
+
+  const activeDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
+  const activeMaterial = (materials || []).find((m) => m.id === activeDocId) || (!selected?.is_chat ? selected : null);
 
   useEffect(() => {
     let live = true;
     if (selected) {
       api.getTutorHistory(selected.id).then((hist) => {
         if (live && Array.isArray(hist)) {
-          setMessages(hist.map((h) => [h.role === "user" ? "You" : "Study tutor", h.content, h.role === "user" ? "you" : ""]));
+          setMessages(hist.map((h) => [
+            h.role === "user" ? "You" : "Study tutor",
+            h.content,
+            h.role === "user" ? "you" : "",
+            h.citations ? (typeof h.citations === "string" ? JSON.parse(h.citations) : h.citations) : []
+          ]));
         }
       }).catch(() => null);
     } else {
@@ -1263,7 +1759,23 @@ function Tutor({
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  
+  const handleCitationClick = (citationObj) => {
+    const cit = typeof citationObj === "string" ? parseCitationInfo(citationObj) : citationObj;
+    if (!cit) return;
+    if (cit.type === "timestamp") {
+      let targetMat = activeMaterial;
+      if (!targetMat || (!targetMat.metadata?.youtube_id && !targetMat.source_url)) {
+        targetMat = materials.find((m) => m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url);
+      }
+      if (onOpenVideo && targetMat) {
+        onOpenVideo(targetMat, cit.seconds);
+      }
+    } else {
+      setShowPreview(true);
+      setTargetCitation(cit);
+    }
+  };
+
   const clearChat = async () => {
     if (messages.length === 0) return;
     if (confirm("Are you sure you want to clear this conversation? This action cannot be undone.")) {
@@ -1290,7 +1802,6 @@ function Tutor({
     e.preventDefault();
     if (!input.trim() || busy) return;
     
-    // Ensure an active session ID exists
     const currentSelected = selected || { id: "chat_" + Date.now(), name: "New Chat", is_chat: true };
     const q = input;
     setInput("");
@@ -1299,8 +1810,9 @@ function Tutor({
     try {
       const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
       const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId);
-      setMessages((x) => [...x, ["Study tutor", r.response || r.answer || r.content || text(r), ""]]);
-      // Lightweight sidebar-only refresh — shows this chat instantly in Recent Chats
+      const answerText = r.response || r.answer || r.content || text(r);
+      const citList = (r.citations && r.citations.length) ? r.citations : Array.from(new Set(answerText.match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || []));
+      setMessages((x) => [...x, ["Study tutor", answerText, "", citList]]);
       if (refreshChats) refreshChats();
     } catch (err) {
       setMessages((x) => [...x, ["System", "Error: " + err.message, "error"]]);
@@ -1310,51 +1822,638 @@ function Tutor({
   };
 
   return (
-    <section className="page tutor-page">
-      {/* Active-document indicator & In-Chat Source Picker */}
-      <div className="source" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'}}>
-        <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth: '240px'}}>
-          <Brain size={18} style={{color: 'var(--primary, #10b981)', flexShrink: 0}} />
-          <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
-          
-          <SourceSelectDropdown
-            materials={materials}
-            selectedSourceIds={selectedSourceIds}
-            onToggleSource={onToggleSource}
-            onSelectAll={onSelectAllSources}
-            onDeleteSource={onDeleteSource}
-          />
+    <section className={`page tutor-page ${showPreview ? "preview-split-layout full-width" : ""}`}>
+      <div className={showPreview ? "preview-split-main" : ""}>
+        {/* Active-document indicator & In-Chat Source Picker */}
+        <div className="source" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'}}>
+          <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth: '240px'}}>
+      <Brain size={18} style={{color: 'var(--icon)', flexShrink: 0}} />
+            <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
+            
+            <SourceSelectDropdown
+              materials={materials}
+              selectedSourceIds={selectedSourceIds}
+              onToggleSource={onToggleSource}
+              onSelectAll={onSelectAllSources}
+              onDeleteSource={onDeleteSource}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+            {activeMaterial && (
+              <button
+                className={`preview-toggle-btn ${showPreview ? "active" : ""}`}
+                onClick={() => setShowPreview(!showPreview)}
+                title={showPreview ? "Hide Reference Preview" : "Show Reference Preview"}
+              >
+                {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span>{showPreview ? "Hide Reference Preview" : "Show Reference Preview"}</span>
+              </button>
+            )}
+
+            {messages.length > 0 && (
+              <button className="btn-ghost" disabled={busy || clearing} onClick={clearChat}>
+                <Trash2 size={16} /> Clear Chat
+              </button>
+            )}
+          </div>
         </div>
 
-        {messages.length > 0 && (
-          <button className="btn-ghost" disabled={busy || clearing} onClick={clearChat} style={{marginLeft:'auto'}}>
-            <Trash2 size={16} /> Clear Chat
-          </button>
-        )}
+        {/* Chat area */}
+        <div className="chat-container" ref={scrollRef}>
+          {messages.length ? messages.map((m, i) => {
+            const citList = Array.isArray(m[3]) && m[3].length ? m[3] : (m[2] !== "you" ? Array.from(new Set(String(m[1]).match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || [])) : []);
+            return (
+              <div key={i} className={`msg ${m[2]}`}>
+                <small>{m[0]}</small>
+                <div className="msg-body">
+                  <Md>{m[1]}</Md>
+                  {citList.length > 0 && m[2] !== "you" && (
+                    <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <small style={{ fontSize: 11, color: 'var(--fg-3)', fontWeight: 600 }}>Sources:</small>
+                      {citList.map((cit, ci) => (
+                        <DynamicCitation
+                          key={ci}
+                          citation={cit}
+                          onClick={handleCitationClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="chat-empty">
+              <MessageCircle size={32} />
+              <h2>What are you working through?</h2>
+              <p>Ask for an explanation, a memory trick, or a step-by-step walkthrough.</p>
+            </div>
+          )}
+          {busy && <div className="msg"><small>Study tutor</small><p className="typing"><LoaderCircle className="spin" size={14} /> Thinking…</p></div>}
+        </div>
+
+        <form className="chat-input" onSubmit={submit}>
+          <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your AI Tutor anything..." />
+          <button className="btn-send" disabled={busy || !input.trim()} type="submit"><Send size={18} /></button>
+        </form>
       </div>
 
-      {/* Chat area — full width, no preview panel */}
-      <div className="chat-container" ref={scrollRef}>
-        {messages.length ? messages.map((m, i) => (
-          <div key={i} className={`msg ${m[2]}`}>
-            <small>{m[0]}</small>
-            <div className="msg-body"><Md>{m[1]}</Md></div>
-          </div>
-        )) : (
-          <div className="chat-empty">
-            <MessageCircle size={32} />
-            <h2>What are you working through?</h2>
-            <p>Ask for an explanation, a memory trick, or a step-by-step walkthrough.</p>
-          </div>
-        )}
-        {busy && <div className="msg"><small>Study tutor</small><p className="typing"><LoaderCircle className="spin" size={14} /> Thinking…</p></div>}
-      </div>
-
-      <form className="chat-input" onSubmit={submit}>
-        <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your AI Tutor anything..." />
-        <button className="btn-send" disabled={busy || !input.trim()} type="submit"><Send size={18} /></button>
-      </form>
+      {showPreview && activeMaterial && (
+        <DocumentPreviewPanel
+          material={activeMaterial}
+          targetCitation={targetCitation}
+          onClose={() => setShowPreview(false)}
+          onOpenVideo={onOpenVideo}
+        />
+      )}
     </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document Preview Panel (Right Side for Studio & AI Tutor)         */
+/* ------------------------------------------------------------------ */
+
+function DocumentPreviewPanel({
+  material,
+  targetCitation,
+  onClose,
+  onOpenVideo
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [videoSeek, setVideoSeek] = useState(0);
+  const [viewMode, setViewMode] = useState("auto"); // "auto", "native", "text"
+  const [pdfAvailable, setPdfAvailable] = useState(true);
+  const [reuploadLoading, setReuploadLoading] = useState(false);
+  const [reuploadError, setReuploadError] = useState("");
+  const reuploadRef = useRef(null);
+  const contentRef = useRef(null);
+
+  const isPDF = material?.name?.toLowerCase().endsWith(".pdf") || material?.type === "PDF Document";
+  const youtubeId = material?.metadata?.youtube_id || extractYoutubeId(material?.source_url) || extractYoutubeId(material?.id);
+  const isYouTube = material?.type === "YouTube Lecture" || !!youtubeId;
+  const rawFileUrl = material?.id ? api.materialFileUrl(material.id) : null;
+
+  // Check if original PDF file exists on server
+  useEffect(() => {
+    if (material?.id && isPDF) {
+      fetch(api.materialFileUrl(material.id), { method: "HEAD" })
+        .then((res) => {
+          setPdfAvailable(res.ok);
+        })
+        .catch(() => {
+          setPdfAvailable(false);
+        });
+    }
+  }, [material?.id, isPDF]);
+
+  // Track target citation changes
+  useEffect(() => {
+    if (!targetCitation) return;
+    if (targetCitation.type === "timestamp" && isYouTube) {
+      setVideoSeek(targetCitation.seconds || 0);
+    }
+  }, [targetCitation, isYouTube]);
+
+  // Parse sections/units/pages from content for text fallback and search
+  const sections = [];
+  if (material?.content) {
+    const raw = material.content;
+    const parts = raw.split(/(?=---\s*\[(?:Page|Slide|Part|Section)\s*\d+[^\]]*\]\s*---)/gi);
+    if (parts.length > 1) {
+      parts.forEach((p, idx) => {
+        const trimmed = p.trim();
+        if (!trimmed) return;
+        const headerMatch = trimmed.match(/^---\s*\[((?:Page|Slide|Part|Section)\s*\d+[^\]]*)\]\s*---\s*/i);
+        if (headerMatch) {
+          sections.push({
+            id: `sec-${idx}`,
+            label: headerMatch[1],
+            text: trimmed.replace(/^---\s*\[(?:Page|Slide|Part|Section)\s*\d+[^\]]*\]\s*---\s*/i, "").trim()
+          });
+        } else {
+          sections.push({
+            id: `sec-${idx}`,
+            label: `Section ${idx + 1}`,
+            text: trimmed
+          });
+        }
+      });
+    } else {
+      // Split by paragraphs
+      const paras = raw.split(/\n\s*\n/);
+      paras.forEach((p, idx) => {
+        const trimmed = p.trim();
+        if (trimmed) {
+          sections.push({
+            id: `para-${idx + 1}`,
+            label: `Paragraph ${idx + 1}`,
+            text: trimmed
+          });
+        }
+      });
+    }
+  }
+
+  // Auto-scroll to citation target when in text mode
+  useEffect(() => {
+    if (!targetCitation) return;
+    const timeout = setTimeout(() => {
+      let el = null;
+      if (targetCitation.type === "page" || targetCitation.type === "slide") {
+        const idRegex = new RegExp(`(?:Page|Slide)\\s*${targetCitation.target}`, "i");
+        el = Array.from(contentRef.current?.querySelectorAll(".preview-section-card") || []).find((card) =>
+          idRegex.test(card.getAttribute("data-label") || "")
+        );
+      } else if (targetCitation.type === "section") {
+        el = Array.from(contentRef.current?.querySelectorAll(".preview-section-card") || []).find((card) =>
+          String(card.getAttribute("data-label") || "").toLowerCase().includes(String(targetCitation.target).toLowerCase())
+        );
+      }
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [targetCitation, viewMode]);
+
+  const filteredSections = sections.filter((s) => {
+    if (!searchTerm) return true;
+    const st = searchTerm.toLowerCase();
+    return s.label.toLowerCase().includes(st) || s.text.toLowerCase().includes(st);
+  });
+
+  // Calculate PDF iframe target with page anchor
+  let pdfPageParam = "";
+  if (targetCitation && (targetCitation.type === "page" || targetCitation.type === "slide")) {
+    pdfPageParam = `#page=${targetCitation.target}`;
+  }
+
+  const effectiveView = viewMode === "auto" ? (isPDF ? "native" : isYouTube ? "video" : "text") : viewMode;
+
+  return (
+    <aside className="preview-split-panel" aria-label="Reference Document Preview">
+      <div className="preview-panel-header">
+        <div className="preview-panel-title">
+          {isYouTube ? (
+            <Video size={17} style={{ color: "#ef4444", flexShrink: 0 }} />
+          ) : isPDF ? (
+            <BookOpen size={17} style={{ color: "var(--green)", flexShrink: 0 }} />
+          ) : (
+            <FileText size={17} style={{ color: "var(--green)", flexShrink: 0 }} />
+          )}
+          <span title={material?.name || "Study Material"}>
+            {material?.name || "No material loaded"}
+          </span>
+          <small>{material?.unit_name ? `${material.total_units || 1} ${material.unit_name}` : material?.type || "Document"}</small>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* View Mode Switcher if document is PDF */}
+          {isPDF && (
+            <div style={{ display: "flex", background: "var(--surface-3)", borderRadius: 6, padding: 2 }}>
+              <button
+                className={`btn-ghost ${effectiveView === "native" ? "active" : ""}`}
+                style={{ padding: "2px 7px", fontSize: 10, fontWeight: 700, borderRadius: 4, background: effectiveView === "native" ? "#fff" : "transparent" }}
+                onClick={() => setViewMode("native")}
+                title="View original PDF document"
+              >
+                PDF
+              </button>
+              <button
+                className={`btn-ghost ${effectiveView === "text" ? "active" : ""}`}
+                style={{ padding: "2px 7px", fontSize: 10, fontWeight: 700, borderRadius: 4, background: effectiveView === "text" ? "#fff" : "transparent" }}
+                onClick={() => setViewMode("text")}
+                title="View parsed text & sections"
+              >
+                Text
+              </button>
+            </div>
+          )}
+
+          {isYouTube && onOpenVideo && (
+            <button
+              className="preview-toggle-btn"
+              style={{ padding: "3px 7px", fontSize: 11, color: "#ef4444", borderColor: "rgba(239,68,68,0.3)" }}
+              onClick={() => onOpenVideo(material, videoSeek)}
+              title="Pop out video player modal"
+            >
+              <ExternalLink size={12} /> Expand
+            </button>
+          )}
+
+          <button className="btn-icon" onClick={onClose} title="Close Preview Panel">
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* Target Citation Banner */}
+      {targetCitation && (
+        <div style={{ padding: "8px 16px", background: "#fef3c7", borderBottom: "1px solid #fde68a", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#92400e", fontWeight: 600 }}>
+            <CornerDownRight size={13} /> {targetCitation.type === "timestamp" ? `Playing at ${targetCitation.label}` : `Navigated to ${targetCitation.label}`}
+          </span>
+          {targetCitation.type === "timestamp" && isYouTube && (
+            <span style={{ color: "#b45309", fontSize: 11, fontWeight: 700 }}>
+              Live in Player
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* 1. Native Video Player in Preview Panel */}
+      {effectiveView === "video" && isYouTube && (
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+          <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, background: "#000", flexShrink: 0 }}>
+            {youtubeId ? (
+              <iframe
+                key={videoSeek}
+                src={`https://www.youtube.com/embed/${youtubeId}?start=${videoSeek}&autoplay=1`}
+                title={material?.name || "YouTube Lecture"}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: 0 }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#fff" }}>
+                Video unavailable
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <small style={{ fontWeight: 700, color: "var(--fg-3)" }}>TIMESTAMPED TRANSCRIPT</small>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Search size={12} style={{ color: "var(--fg-3)" }} />
+              <input
+                type="text"
+                placeholder="Filter transcript..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ border: "1px solid var(--border)", borderRadius: 4, padding: "2px 6px", fontSize: 11 }}
+              />
+            </div>
+          </div>
+
+          <div className="preview-panel-body" style={{ flex: 1, padding: 12 }}>
+            {sections.filter(s => !searchTerm || s.text.toLowerCase().includes(searchTerm.toLowerCase())).map((sec, idx) => {
+              const tsMatch = sec.label.match(/\d{1,2}:\d{2}/) || sec.text.match(/\[(\d{1,2}:\d{2})\]/);
+              const tsSecs = tsMatch ? parseTimestampSeconds(tsMatch[1] || tsMatch[0]) : 0;
+              const isCurrent = targetCitation?.type === "timestamp" && Math.abs(targetCitation.seconds - tsSecs) < 15;
+
+              return (
+                <div
+                  key={idx}
+                  className={`preview-section-card ${isCurrent ? "highlighted" : ""}`}
+                  style={{ padding: "8px 12px", marginBottom: 8, cursor: "pointer" }}
+                  onClick={() => {
+                    setVideoSeek(tsSecs);
+                  }}
+                  title="Click to jump video to this timestamp"
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span className="preview-section-badge yt-badge">
+                      <Play size={10} fill="#dc2626" /> {tsMatch ? (tsMatch[1] || tsMatch[0]) : sec.label}
+                    </span>
+                    {isCurrent && <span className="preview-badge-cit">Active</span>}
+                  </div>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--fg)" }}>
+                    {sec.text.replace(/^\[\d{1,2}:\d{2}\]\s*/, "")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 2. Original Form PDF View directly in Preview Panel */}
+      {effectiveView === "native" && isPDF && (
+        <div style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column" }}>
+          {pdfAvailable && rawFileUrl ? (
+            <object
+              key={`${material.id}_${pdfPageParam}`}
+              data={`${rawFileUrl}${pdfPageParam}`}
+              type="application/pdf"
+              style={{ width: "100%", height: "100%", border: 0, flex: 1 }}
+            >
+              <iframe
+                src={`${rawFileUrl}${pdfPageParam}`}
+                title={material.name}
+                style={{ width: "100%", height: "100%", border: 0, flex: 1 }}
+              />
+            </object>
+          ) : (
+            /* ── Re-upload prompt for older materials that lack a saved binary ── */
+            <div style={{
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              height: "100%", gap: 16, padding: 24, textAlign: "center"
+            }}>
+              {/* Hidden file input */}
+              <input
+                ref={reuploadRef}
+                type="file"
+                accept=".pdf"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f || !material?.id) return;
+                  setReuploadLoading(true);
+                  setReuploadError("");
+                  try {
+                    await api.reuploadMaterial(material.id, f);
+                    setPdfAvailable(true);
+                  } catch (err) {
+                    setReuploadError(err.message || "Upload failed. Please try again.");
+                  } finally {
+                    setReuploadLoading(false);
+                    // Reset the input so the same file can be re-selected if needed
+                    if (reuploadRef.current) reuploadRef.current.value = "";
+                  }
+                }}
+              />
+              <div style={{
+                width: 64, height: 64, borderRadius: "50%",
+                background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+                <FileText size={28} style={{ color: "var(--fg-3)" }} />
+              </div>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Native preview unavailable</p>
+                <p style={{ fontSize: 13, color: "var(--fg-3)", lineHeight: 1.6, maxWidth: 260 }}>
+                  This file was uploaded before native preview was enabled. Re-upload the same PDF to view it inline here — your notes and progress are kept.
+                </p>
+              </div>
+              {reuploadError && (
+                <p style={{ fontSize: 12, color: "var(--red, #ef4444)", margin: 0 }}>{reuploadError}</p>
+              )}
+              <div style={{ display: "flex", gap: 8, flexDirection: "column", width: "100%", maxWidth: 240 }}>
+                <button
+                  className="btn-primary"
+                  style={{ width: "100%", justifyContent: "center", gap: 6 }}
+                  disabled={reuploadLoading}
+                  onClick={() => reuploadRef.current?.click()}
+                >
+                  {reuploadLoading ? (
+                    <><Loader2 size={14} className="spin" /> Uploading…</>
+                  ) : (
+                    <><Upload size={14} /> Re-upload PDF</>
+                  )}
+                </button>
+                <button
+                  className="btn-ghost"
+                  style={{ width: "100%", justifyContent: "center", fontSize: 12, color: "var(--fg-3)" }}
+                  onClick={() => setViewMode("text")}
+                >
+                  View extracted text instead
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. Parsed Text / Sections View */}
+      {effectiveView === "text" && (
+        <>
+          <div className="preview-panel-search">
+            <Search size={14} style={{ color: "var(--fg-3)" }} />
+            <input
+              type="text"
+              placeholder="Search in reference material..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button className="btn-icon" style={{ padding: 2 }} onClick={() => setSearchTerm("")}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          <div className="preview-panel-body" ref={contentRef}>
+            {!material ? (
+              <p className="muted" style={{ textAlign: "center", marginTop: 40 }}>No reference material selected.</p>
+            ) : filteredSections.length > 0 ? (
+              filteredSections.map((sec) => {
+                let isTarget = false;
+                if (targetCitation) {
+                  if (targetCitation.type === "page" || targetCitation.type === "slide") {
+                    const pat = new RegExp(`(?:Page|Slide)\\s*${targetCitation.target}`, "i");
+                    isTarget = pat.test(sec.label);
+                  } else if (targetCitation.type === "section") {
+                    isTarget = sec.label.toLowerCase().includes(String(targetCitation.target).toLowerCase());
+                  }
+                }
+
+                return (
+                  <div
+                    key={sec.id}
+                    className={`preview-section-card ${isTarget ? "highlighted" : ""}`}
+                    data-label={sec.label}
+                  >
+                    <div className="preview-section-header">
+                      <span className="preview-section-badge">{sec.label}</span>
+                      {isTarget && (
+                        <span className="preview-badge-cit">
+                          <Sparkles size={11} /> Cited Section
+                        </span>
+                      )}
+                    </div>
+                    <div className="preview-section-content">
+                      {sec.text}
+                    </div>
+                  </div>
+                );
+              })
+            ) : material.content ? (
+              <div className="preview-section-card">
+                <div className="preview-section-content" style={{ whiteSpace: "pre-wrap" }}>
+                  {material.content}
+                </div>
+              </div>
+            ) : (
+              <p className="muted" style={{ textAlign: "center", marginTop: 40 }}>
+                {searchTerm ? "No matching text found." : "Document content is empty."}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </aside>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Interactive Video Player Modal                                     */
+/* ------------------------------------------------------------------ */
+
+function VideoPlayerModal({ material, initialSeconds = 0, onClose }) {
+  const [seekTime, setSeekTime] = useState(initialSeconds);
+  const [search, setSearch] = useState("");
+  const youtubeId = material?.metadata?.youtube_id || extractYoutubeId(material?.source_url) || extractYoutubeId(material?.id);
+
+  let segments = material?.metadata?.segments || [];
+  if ((!segments || !segments.length) && material?.content) {
+    const lines = material.content.split('\n');
+    segments = [];
+    for (const line of lines) {
+      const m = line.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]\s*(.+)$/);
+      if (m) {
+        segments.push({
+          timestamp: m[1],
+          seconds: parseTimestampSeconds(m[1]),
+          text: m[2]
+        });
+      }
+    }
+  }
+
+  const filteredSegments = segments.filter((s) =>
+    !search || s.text.toLowerCase().includes(search.toLowerCase()) || s.timestamp.includes(search)
+  );
+
+  const formatSecs = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  return (
+    <div className="back" style={{ zIndex: 1000 }}>
+      <div className="modal video-modal" style={{ maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
+        <button className="btn-icon close-btn" onClick={onClose}><X size={18} /></button>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, paddingRight: 30 }}>
+          <span style={{ background: '#ef4444', color: '#fff', padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, letterSpacing: '0.05em' }}>
+            YOUTUBE LECTURE
+          </span>
+          <h3 style={{ margin: 0, fontSize: 17, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {material?.name}
+          </h3>
+          {material?.metadata?.duration_formatted && (
+            <span style={{ fontSize: 12, color: 'var(--fg-3)', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <Clock size={13} /> {material.metadata.duration_formatted}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 1.4fr) minmax(280px, 1fr)', gap: 18, flex: 1, minHeight: 0 }}>
+          {/* Left: Video Player */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+              {youtubeId ? (
+                <iframe
+                  key={seekTime}
+                  src={`https://www.youtube.com/embed/${youtubeId}?start=${seekTime}&autoplay=1`}
+                  title={material?.name || "YouTube Video"}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  Video preview unavailable
+                </div>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: 'var(--fg-3)' }}>
+              <span>Seeking position: <b style={{ color: '#ef4444' }}>{formatSecs(seekTime)}</b></span>
+              {material?.source_url && (
+                <a href={material.source_url} target="_blank" rel="noreferrer" style={{ color: 'var(--fg-2)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+                  Open on YouTube <ExternalLink size={12} />
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Timestamped transcript */}
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface-2, rgba(255,255,255,0.02))' }}>
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <b style={{ fontSize: 13 }}>Timestamped Transcript ({segments.length} units)</b>
+            </div>
+            <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
+              <input
+                type="text"
+                placeholder="Search transcript by keyword or MM:SS..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-2)', color: 'var(--fg-1)' }}
+              />
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+              {filteredSegments.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--fg-3)', textAlign: 'center', marginTop: 24 }}>No matching transcript segments found</p>
+              ) : (
+                filteredSegments.map((s, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setSeekTime(s.seconds)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      marginBottom: 6,
+                      background: seekTime === s.seconds ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.03)',
+                      borderLeft: seekTime === s.seconds ? '3px solid #ef4444' : '3px solid transparent',
+                      transition: 'background 0.15s'
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, color: '#ef4444', marginRight: 8, fontFamily: 'monospace', fontSize: 11.5 }}>
+                      [{s.timestamp}]
+                    </span>
+                    <span style={{ color: 'var(--fg-2)', lineHeight: 1.45 }}>{s.text}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1362,20 +2461,160 @@ function Tutor({
 /*  Upload Modal                                                       */
 /* ------------------------------------------------------------------ */
 
-function UploadModal({ busy, close, choose, sample }) {
+function UploadModal({ busy, close, choose, sample, onIngestYoutube }) {
+  const [tab, setTab] = useState("file"); // "file" | "youtube"
+  const [ytUrl, setYtUrl] = useState("");
+  const [ytError, setYtError] = useState("");
+
+  const handleYtSubmit = async (e) => {
+    e.preventDefault();
+    if (!ytUrl.trim() || busy) return;
+    setYtError("");
+    try {
+      await onIngestYoutube(ytUrl.trim());
+    } catch (err) {
+      setYtError(err.message || "Failed to ingest YouTube video");
+    }
+  };
+
+  const loadPreset = (url) => {
+    setYtUrl(url);
+    setYtError("");
+  };
+
   return (
     <div className="back">
-      <div className="modal">
+      <div className="modal" style={{ maxWidth: '520px' }}>
         <button className="btn-icon close-btn" onClick={close}><X size={18} /></button>
-        <small className="pill">ADD A SOURCE</small>
-        <h2>Bring in your study material</h2>
-        <p>PDFs, documents, slides, text files, and images are all welcome.</p>
-        <button className="drop" disabled={busy} onClick={choose}>
-          {busy ? <LoaderCircle className="spin" size={27} /> : <Upload size={27} />}
-          <b>{busy ? "Adding material…" : "Choose a file"}</b>
-          <small>or drag and drop it here</small>
-        </button>
-        <button className="btn-link sample" disabled={busy} onClick={sample}>Try with sample notes <ChevronRight size={16} /></button>
+        <small className="pill">ADD STUDY MATERIAL</small>
+        <h2>Bring in your course material</h2>
+
+        {/* Tab switcher */}
+        <div style={{ display: 'flex', gap: 8, margin: '16px 0 20px', background: 'var(--bg-2, rgba(255,255,255,0.05))', padding: 4, borderRadius: 8 }}>
+          <button
+            type="button"
+            onClick={() => setTab("file")}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: 'none',
+              background: tab === "file" ? 'var(--primary, #10b981)' : 'transparent',
+              color: tab === "file" ? '#fff' : 'var(--fg-2)',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            <Upload size={15} /> Document / File
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("youtube")}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: 'none',
+              background: tab === "youtube" ? '#ef4444' : 'transparent',
+              color: tab === "youtube" ? '#fff' : 'var(--fg-2)',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}
+          >
+            <Video size={15} /> YouTube Video
+          </button>
+        </div>
+
+        {tab === "file" ? (
+          <div>
+            <p style={{ color: 'var(--fg-2)', fontSize: 13, marginBottom: 16 }}>
+              PDFs, slide decks (PPTX), Word documents, images, and text notes.
+            </p>
+            <button className="drop" disabled={busy} onClick={choose}>
+              {busy ? <LoaderCircle className="spin" size={27} /> : <Upload size={27} />}
+              <b>{busy ? "Adding material…" : "Choose a file"}</b>
+              <small>or drag and drop it here</small>
+            </button>
+            <button className="btn-link sample" disabled={busy} onClick={sample}>
+              Try with sample notes <ChevronRight size={16} />
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p style={{ color: 'var(--fg-2)', fontSize: 13, marginBottom: 12 }}>
+              Paste any lecture or educational video URL. We will automatically ingest, extract timestamped transcript units, and ground all study materials in it.
+            </p>
+
+            <form onSubmit={handleYtSubmit}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={ytUrl}
+                  onChange={(e) => setYtUrl(e.target.value)}
+                  disabled={busy}
+                  style={{
+                    flex: 1,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-2)',
+                    color: 'var(--fg-1)',
+                    fontSize: 13
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !ytUrl.trim()}
+                  className="btn-primary"
+                  style={{ background: '#ef4444', borderColor: '#ef4444', whiteSpace: 'nowrap' }}
+                >
+                  {busy ? <><LoaderCircle className="spin" size={15} /> Ingesting…</> : <><Play size={15} fill="#fff" /> Ingest Video</>}
+                </button>
+              </div>
+            </form>
+
+            {ytError && (
+              <div style={{ color: '#ef4444', fontSize: 12, marginBottom: 12, padding: '8px 10px', borderRadius: 6, background: 'rgba(239,68,68,0.1)' }}>
+                {ytError}
+              </div>
+            )}
+
+            <div style={{ marginTop: 14 }}>
+              <small style={{ fontSize: 11, color: 'var(--fg-3)', display: 'block', marginBottom: 6 }}>
+                Or try a sample lecture:
+              </small>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => loadPreset("https://www.youtube.com/watch?v=aircAruvnKk")}
+                  className="btn-ghost"
+                  style={{ textAlign: 'left', padding: '6px 8px', fontSize: 12, justifyContent: 'flex-start' }}
+                >
+                  📺 <b>3Blue1Brown</b> — What is a Neural Network? (18m)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadPreset("https://www.youtube.com/watch?v=9vKqVkMQHKk")}
+                  className="btn-ghost"
+                  style={{ textAlign: 'left', padding: '6px 8px', fontSize: 12, justifyContent: 'flex-start' }}
+                >
+                  📺 <b>Khan Academy</b> — Derivative as slope of curve (9m)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

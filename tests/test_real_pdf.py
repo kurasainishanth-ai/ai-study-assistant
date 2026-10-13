@@ -1,27 +1,24 @@
-﻿import sys
+import sys
 import os
+import unittest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend')))
 from extractors.pdf_extractor import extract_pdf_content
 
-# Assuming BayesianParameterEstimation.pdf is in the workspace root or some uploads folder?
-# The user uploaded it, let's find it.
-def find_pdf():
-    for root, dirs, files in os.walk(r"C:\Users\kuras\Desktop\ai-study-assistant"):
-        if "BayesianParameterEstimation.pdf" in files:
-            return os.path.join(root, "BayesianParameterEstimation.pdf")
-    return None
+class TestRealPDFExtraction(unittest.TestCase):
+    def test_real_pdf_extraction_if_available(self):
+        pdf_name = "BayesianParameterEstimation.pdf"
+        found = None
+        for root, dirs, files in os.walk(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))):
+            if pdf_name in files:
+                found = os.path.join(root, pdf_name)
+                break
 
-pdf_path = find_pdf()
-if not pdf_path:
-    print("Could not find the PDF file.")
-    sys.exit(1)
+        if not found:
+            self.skipTest("Local test PDF BayesianParameterEstimation.pdf not present in workspace.")
 
-print(f"Testing extraction on {pdf_path}")
-result = extract_pdf_content(pdf_path)
+        result = extract_pdf_content(found)
+        self.assertIsNotNone(result)
+        self.assertIn("content", result)
 
-content = result.get("content", "")
-pages = content.split("--- [Page ")
-for p in pages:
-    if p.startswith("4"):
-        print("PAGE 4 RESULT:\n")
-        print(p)
+if __name__ == '__main__':
+    unittest.main()
