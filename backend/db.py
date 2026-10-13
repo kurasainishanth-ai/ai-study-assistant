@@ -161,6 +161,47 @@ def init_db():
             )
         """)
 
+        # 7. Deduplication Fingerprints for Adaptive Assessment
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_question_fingerprints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doc_id TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                question_text TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(doc_id, fingerprint)
+            )
+        """)
+
+        # 8. Learner Model (BKT / Evidence-Weighted Mastery State)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS learner_mastery (
+                student_id TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                mastery_score REAL NOT NULL,
+                confidence REAL NOT NULL,
+                uncertainty REAL NOT NULL,
+                attempts_count INTEGER DEFAULT 0,
+                correct_count INTEGER DEFAULT 0,
+                last_practiced TEXT,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (student_id, topic)
+            )
+        """)
+
+        # 9. Learner Interaction Events Log
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS learner_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                score REAL NOT NULL,
+                evidence_basis TEXT,
+                timestamp TEXT NOT NULL
+            )
+        """)
+
         conn.commit()
 
 # --- Material Operations ---
@@ -633,6 +674,23 @@ def get_learning_progress() -> Dict[str, Any]:
             }
             if avg_t < 70:
                 revision_topics.append(t)
+
+        # Merge BKT Learner Model mastery state
+        cursor.execute("SELECT topic, mastery_score, confidence, uncertainty, attempts_count FROM learner_mastery WHERE student_id = 'default_student'")
+        bkt_rows = cursor.fetchall()
+        for br in bkt_rows:
+            t = br["topic"]
+            m_pct = round(br["mastery_score"] * 100, 1)
+            topic_mastery[t] = {
+                "average_score": m_pct,
+                "mastery_probability": round(br["mastery_score"], 3),
+                "confidence": round(br["confidence"], 3),
+                "uncertainty": round(br["uncertainty"], 3),
+                "attempts": br["attempts_count"],
+                "status": "Mastered" if br["mastery_score"] >= 0.80 and br["confidence"] >= 0.60 else ("Review Recommended" if br["mastery_score"] < 0.60 else "In Progress")
+            }
+            if br["mastery_score"] < 0.60 and t not in revision_topics:
+                revision_topics.append(t)
                 
         # Recommended next activity
         if fc_difficult > 0:
@@ -806,4 +864,111 @@ def get_recent_chats() -> List[Dict[str, Any]]:
                     "is_doc_chat": not doc_id.startswith("chat_")
                 })
         return results
+
+
+# --- Adaptive Assessment Fingerprinting ---
+
+def is_question_fingerprinted(doc_id: str, fingerprint: str) -> bool:
+    """Checks if a question fingerprint has already been generated for this material."""
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM quiz_question_fingerprints WHERE doc_id = ? AND fingerprint = ?",
+            (doc_id, fingerprint)
+        )
+        return cursor.fetchone() is not None
+
+def record_question_fingerprints(doc_id: str, questions: List[Dict[str, Any]]):
+    """Stores question fingerprints to prevent duplicates across sessions."""
+    init_db()
+    now_str = datetime.now().strftime("%b %d, %H:%M")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        for q in questions:
+            fp = q.get("fingerprint")
+            q_text = q.get("question", "")
+            if fp and q_text:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO quiz_question_fingerprints (doc_id, fingerprint, question_text, created_at)
+                    VALUES (?, ?, ?, ?)
+                """, (doc_id, fp, q_text, now_str))
+        conn.commit()
+
+
+# --- Learner Model Persistence (BKT / Evidence-Weighted) ---
+
+def get_learner_mastery_data(student_id: str = "default_student") -> Dict[str, Any]:
+    """Retrieves all tracked topics and mastery statistics for a student."""
+    init_db()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT topic, mastery_score, confidence, uncertainty, attempts_count, correct_count, last_practiced, updated_at
+            FROM learner_mastery
+            WHERE student_id = ?
+            ORDER BY mastery_score ASC
+        """, (student_id,))
+        rows = cursor.fetchall()
+        topics = {}
+        for r in rows:
+            topics[r["topic"]] = {
+                "mastery_score": round(r["mastery_score"], 3),
+                "confidence": round(r["confidence"], 3),
+                "uncertainty": round(r["uncertainty"], 3),
+                "attempts_count": r["attempts_count"],
+                "correct_count": r["correct_count"],
+                "accuracy": round((r["correct_count"] / max(r["attempts_count"], 1)) * 100, 1),
+                "last_practiced": r["last_practiced"],
+                "updated_at": r["updated_at"]
+            }
+        return topics
+
+def update_learner_topic_mastery(
+    student_id: str,
+    topic: str,
+    mastery_score: float,
+    confidence: float,
+    uncertainty: float,
+    is_correct: bool,
+    event_type: str = "quiz",
+    evidence_basis: str = ""
+):
+    """Updates the persistent mastery state and appends to learner events log."""
+    init_db()
+    now_str = datetime.now().strftime("%b %d, %H:%M")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT attempts_count, correct_count FROM learner_mastery
+            WHERE student_id = ? AND topic = ?
+        """, (student_id, topic))
+        row = cursor.fetchone()
+
+        if row:
+            attempts = row["attempts_count"] + 1
+            correct = row["correct_count"] + (1 if is_correct else 0)
+            cursor.execute("""
+                UPDATE learner_mastery
+                SET mastery_score = ?, confidence = ?, uncertainty = ?,
+                    attempts_count = ?, correct_count = ?, last_practiced = ?, updated_at = ?
+                WHERE student_id = ? AND topic = ?
+            """, (mastery_score, confidence, uncertainty, attempts, correct, now_str, now_str, student_id, topic))
+        else:
+            attempts = 1
+            correct = 1 if is_correct else 0
+            cursor.execute("""
+                INSERT INTO learner_mastery (
+                    student_id, topic, mastery_score, confidence, uncertainty,
+                    attempts_count, correct_count, last_practiced, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (student_id, topic, mastery_score, confidence, uncertainty, attempts, correct, now_str, now_str))
+
+        cursor.execute("""
+            INSERT INTO learner_events (student_id, event_type, topic, score, evidence_basis, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (student_id, event_type, topic, 1.0 if is_correct else 0.0, evidence_basis, now_str))
+
+        conn.commit()
+
 

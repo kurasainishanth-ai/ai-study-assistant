@@ -138,6 +138,12 @@ def get_friendly_file_type(filename: str) -> str:
         return "Image"
     elif ext in [".txt", ".md"]:
         return "Text / Markdown Note"
+    elif ext in [".mp4", ".webm", ".mov", ".mkv"]:
+        return "Video Lecture"
+    elif ext in [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"]:
+        return "Audio Lecture"
+    elif ext in [".srt", ".vtt"]:
+        return "Lecture Transcript"
     return "Document"
 
 
@@ -426,6 +432,7 @@ def tutor_chat_endpoint(req: TutorChatRequest):
             'content': result.get('answer', ''),
             'response': result.get('answer', ''),
             'citations': result.get('citations', []),
+            'structured_citations': result.get('structured_citations', []),
             'level': req.level,
             'source_doc_id': result.get('source_doc_id'),
             'source_name': result.get('source_name'),
@@ -715,5 +722,34 @@ def update_task_status_endpoint(req: TaskStatusRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Task status update error: {str(e)}")
+
+
+# =========================================================
+# 12. Learner Model & Dynamic Personalization (Track D)
+# =========================================================
+
+@app.get("/api/learner/mastery")
+def get_learner_mastery_endpoint(student_id: str = "default_student"):
+    """Returns Bayesian Knowledge Tracing mastery scores, confidence, and scaffolding recommendations."""
+    from services.learner_model import get_scaffolding_recommendation
+    mastery_data = db.get_learner_mastery_data(student_id)
+    scaffolding = {topic: get_scaffolding_recommendation(topic, student_id) for topic in mastery_data}
+    return {
+        "student_id": student_id,
+        "topics": mastery_data,
+        "scaffolding": scaffolding,
+        "cold_start": len(mastery_data) == 0
+    }
+
+@app.post("/api/learner/diagnostic/{doc_id}")
+def generate_diagnostic_endpoint(doc_id: str):
+    """Generates a diagnostic intake assessment to calibrate the baseline learner model."""
+    from services.learner_model import generate_diagnostic_intake
+    try:
+        questions = generate_diagnostic_intake(doc_id)
+        return {"doc_id": doc_id, "questions": questions, "is_diagnostic": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Diagnostic generation error: {str(e)}")
+
 
 

@@ -83,5 +83,11 @@ export const api = {
   generateRevisionPlan: (data) => request("/scheduler/generate", json(data)),
   updateRevisionTaskStatus: (docId, taskId, completed) =>
     request("/scheduler/task-status", json({ doc_id: docId, task_id: taskId, completed })),
+
+  // Learner Model (Track D)
+  getLearnerMastery: (studentId = "default_student") =>
+    request("/learner/mastery?student_id=" + encodeURIComponent(studentId)),
+  generateDiagnostic: (id) =>
+    request("/learner/diagnostic/" + encodeURIComponent(id), { method: "POST" }),
 };
 

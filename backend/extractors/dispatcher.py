@@ -4,13 +4,16 @@ from .ppt_extractor import extract_ppt_content
 from .docx_extractor import extract_docx_content
 from .image_extractor import extract_image_content
 from .text_extractor import extract_text_content
+from .video_extractor import extract_video_content
 
 SUPPORTED_EXTENSIONS = {
     "pdf": [".pdf"],
     "ppt": [".pptx", ".ppt"],
     "docx": [".docx", ".doc"],
     "image": [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"],
-    "text": [".txt", ".md", ".py", ".csv", ".json", ".html", ".rst"]
+    "text": [".txt", ".md", ".py", ".csv", ".json", ".html", ".rst"],
+    "video": [".mp4", ".webm", ".mov", ".mkv", ".srt", ".vtt"],
+    "audio": [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"]
 }
 
 def extract_content(file_path: str) -> dict:
@@ -30,6 +33,8 @@ def extract_content(file_path: str) -> dict:
         data = extract_image_content(file_path)
     elif ext in SUPPORTED_EXTENSIONS["text"]:
         data = extract_text_content(file_path)
+    elif ext in SUPPORTED_EXTENSIONS["video"] or ext in SUPPORTED_EXTENSIONS["audio"]:
+        data = extract_video_content(file_path)
     else:
         # Fallback to plain text attempt
         data = extract_text_content(file_path)

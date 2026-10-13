@@ -1,0 +1,554 @@
+{
+  "beginner": {
+    "metadata": {
+      "student_id": "sim_student_beginner",
+      "description": "Novice student with limited background knowledge who struggles with technical definitions and benefits from heavy scaffolding.",
+      "p_l0": 0.15,
+      "true_prob_correct": 0.4,
+      "p_t": 0.12,
+      "p_g": 0.25,
+      "p_s": 0.15
+    },
+    "topic_trajectories": {
+      "Linear Regression & Cost Functions": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 2,
+          "session_score": "2/3",
+          "mastery_score": 0.767,
+          "confidence": 0.468,
+          "uncertainty": 0.532,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 3,
+          "session_score": "1/3",
+          "mastery_score": 0.454,
+          "confidence": 0.443,
+          "uncertainty": 0.557,
+          "scaffolding_level": "intermediate",
+          "recommended_difficulty": "medium"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 4,
+          "session_score": "1/3",
+          "mastery_score": 0.312,
+          "confidence": 0.549,
+          "uncertainty": 0.451,
+          "scaffolding_level": "beginner",
+          "recommended_difficulty": "easy"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 6,
+          "session_score": "2/3",
+          "mastery_score": 0.646,
+          "confidence": 0.535,
+          "uncertainty": 0.465,
+          "scaffolding_level": "intermediate",
+          "recommended_difficulty": "medium"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 8,
+          "session_score": "2/3",
+          "mastery_score": 0.866,
+          "confidence": 0.766,
+          "uncertainty": 0.234,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ],
+      "Gradient Descent Optimization": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 1,
+          "session_score": "1/3",
+          "mastery_score": 0.244,
+          "confidence": 0.456,
+          "uncertainty": 0.544,
+          "scaffolding_level": "beginner",
+          "recommended_difficulty": "easy"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 2,
+          "session_score": "1/3",
+          "mastery_score": 0.26,
+          "confidence": 0.554,
+          "uncertainty": 0.446,
+          "scaffolding_level": "beginner",
+          "recommended_difficulty": "easy"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 4,
+          "session_score": "2/3",
+          "mastery_score": 0.796,
+          "confidence": 0.653,
+          "uncertainty": 0.347,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 6,
+          "session_score": "2/3",
+          "mastery_score": 0.941,
+          "confidence": 0.881,
+          "uncertainty": 0.119,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 7,
+          "session_score": "1/3",
+          "mastery_score": 0.77,
+          "confidence": 0.643,
+          "uncertainty": 0.357,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ],
+      "Regularization & Overfitting": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 0,
+          "session_score": "0/3",
+          "mastery_score": 0.15,
+          "confidence": 0.57,
+          "uncertainty": 0.43,
+          "scaffolding_level": "beginner",
+          "recommended_difficulty": "easy"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 1,
+          "session_score": "1/3",
+          "mastery_score": 0.244,
+          "confidence": 0.57,
+          "uncertainty": 0.43,
+          "scaffolding_level": "beginner",
+          "recommended_difficulty": "easy"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 1,
+          "session_score": "0/3",
+          "mastery_score": 0.151,
+          "confidence": 0.722,
+          "uncertainty": 0.278,
+          "scaffolding_level": "beginner",
+          "recommended_difficulty": "easy"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 2,
+          "session_score": "1/3",
+          "mastery_score": 0.45,
+          "confidence": 0.497,
+          "uncertainty": 0.503,
+          "scaffolding_level": "intermediate",
+          "recommended_difficulty": "medium"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 5,
+          "session_score": "3/3",
+          "mastery_score": 0.98,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ]
+    }
+  },
+  "intermediate": {
+    "metadata": {
+      "student_id": "sim_student_intermediate",
+      "description": "Competent student with foundational knowledge who occasionally misses nuanced edge cases.",
+      "p_l0": 0.45,
+      "true_prob_correct": 0.75,
+      "p_t": 0.15,
+      "p_g": 0.2,
+      "p_s": 0.1
+    },
+    "topic_trajectories": {
+      "Linear Regression & Cost Functions": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 3,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.805,
+          "uncertainty": 0.195,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 6,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.919,
+          "uncertainty": 0.081,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 8,
+          "session_score": "2/3",
+          "mastery_score": 0.936,
+          "confidence": 0.859,
+          "uncertainty": 0.141,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 11,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 14,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ],
+      "Gradient Descent Optimization": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 2,
+          "session_score": "2/3",
+          "mastery_score": 0.904,
+          "confidence": 0.652,
+          "uncertainty": 0.348,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 3,
+          "session_score": "1/3",
+          "mastery_score": 0.562,
+          "confidence": 0.447,
+          "uncertainty": 0.553,
+          "scaffolding_level": "intermediate",
+          "recommended_difficulty": "medium"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 6,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 8,
+          "session_score": "2/3",
+          "mastery_score": 0.936,
+          "confidence": 0.873,
+          "uncertainty": 0.127,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 10,
+          "session_score": "2/3",
+          "mastery_score": 0.985,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ],
+      "Regularization & Overfitting": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 2,
+          "session_score": "2/3",
+          "mastery_score": 0.822,
+          "confidence": 0.533,
+          "uncertainty": 0.467,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 5,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.919,
+          "uncertainty": 0.081,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 7,
+          "session_score": "2/3",
+          "mastery_score": 0.936,
+          "confidence": 0.859,
+          "uncertainty": 0.141,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 9,
+          "session_score": "2/3",
+          "mastery_score": 0.936,
+          "confidence": 0.873,
+          "uncertainty": 0.127,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 12,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ]
+    }
+  },
+  "advanced": {
+    "metadata": {
+      "student_id": "sim_student_advanced",
+      "description": "High-proficiency student who consistently demonstrates theoretical mastery and problem-solving fluency.",
+      "p_l0": 0.8,
+      "true_prob_correct": 0.95,
+      "p_t": 0.2,
+      "p_g": 0.15,
+      "p_s": 0.05
+    },
+    "topic_trajectories": {
+      "Linear Regression & Cost Functions": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 3,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.805,
+          "uncertainty": 0.195,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 6,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.919,
+          "uncertainty": 0.081,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 7,
+          "session_score": "1/3",
+          "mastery_score": 0.823,
+          "confidence": 0.688,
+          "uncertainty": 0.312,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 10,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 13,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ],
+      "Gradient Descent Optimization": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 3,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.805,
+          "uncertainty": 0.195,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 5,
+          "session_score": "2/3",
+          "mastery_score": 0.984,
+          "confidence": 0.907,
+          "uncertainty": 0.093,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 8,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 11,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 14,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ],
+      "Regularization & Overfitting": [
+        {
+          "session_number": 1,
+          "attempts_cumulative": 3,
+          "correct_cumulative": 3,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.805,
+          "uncertainty": 0.195,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 2,
+          "attempts_cumulative": 6,
+          "correct_cumulative": 6,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.919,
+          "uncertainty": 0.081,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 3,
+          "attempts_cumulative": 9,
+          "correct_cumulative": 9,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 4,
+          "attempts_cumulative": 12,
+          "correct_cumulative": 12,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        },
+        {
+          "session_number": 5,
+          "attempts_cumulative": 15,
+          "correct_cumulative": 15,
+          "session_score": "3/3",
+          "mastery_score": 0.99,
+          "confidence": 0.95,
+          "uncertainty": 0.05,
+          "scaffolding_level": "advanced",
+          "recommended_difficulty": "hard"
+        }
+      ]
+    }
+  }
+}

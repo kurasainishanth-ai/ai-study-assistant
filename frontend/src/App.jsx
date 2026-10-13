@@ -2155,7 +2155,12 @@ function Tutor({
     if (selected) {
       api.getTutorHistory(selected.id).then((hist) => {
         if (live && Array.isArray(hist)) {
-          setMessages(hist.map((h) => [h.role === "user" ? "You" : "Study tutor", h.content, h.role === "user" ? "you" : ""]));
+          setMessages(hist.map((h) => [
+            h.role === "user" ? "You" : "Study tutor",
+            h.content,
+            h.role === "user" ? "you" : "",
+            h.citations || []
+          ]));
         }
       }).catch(() => null);
     } else {
@@ -2204,7 +2209,8 @@ function Tutor({
       const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
       const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId);
       const answerText = r.response || r.answer || r.content || text(r);
-      setMessages((x) => [...x, ["Study tutor", answerText, ""]]);
+      const cits = r.structured_citations?.length ? r.structured_citations : (r.citations || []);
+      setMessages((x) => [...x, ["Study tutor", answerText, "", cits]]);
       
       // Auto-read aloud if user spoke the question
       if (wasVoiceRef.current && !isMuted) {
@@ -2405,6 +2411,36 @@ function Tutor({
               )}
             </div>
             <div className="msg-body"><Md>{m[1]}</Md></div>
+            {m[3] && m[3].length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                {m[3].map((cit, ci) => {
+                  const label = typeof cit === 'string'
+                    ? cit
+                    : (cit.source_name && !cit.source_name.includes("All Workspace") ? `${cit.source_name}: ${cit.raw_citation || cit.location_val}` : (cit.raw_citation || cit.location_val));
+                  const titleTip = typeof cit === 'object' && cit.excerpt ? `Source Excerpt:\n"${cit.excerpt}"` : undefined;
+                  return (
+                    <span
+                      key={ci}
+                      title={titleTip}
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: 'rgba(16,185,129,0.1)',
+                        color: 'var(--primary, #10b981)',
+                        border: '1px solid rgba(16,185,129,0.25)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      📍 {label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )) : (
           <div className="chat-empty">

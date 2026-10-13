@@ -1,0 +1,124 @@
+{
+  "benchmark_metadata": {
+    "name": "StudyVerse Track D Academic Grounding & Adaptive Learning Benchmark",
+    "version": "1.0",
+    "domain": "Machine Learning and Artificial Intelligence Course"
+  },
+  "metrics": {
+    "grounding_faithfulness": 0.809,
+    "citation_recall": 0.8,
+    "citation_precision": 0.719,
+    "negative_rejection_accuracy": 1.0,
+    "multi_hop_synthesis_score": 1.0,
+    "total_test_cases": 8
+  },
+  "case_details": [
+    {
+      "id": "TC_01",
+      "category": "direct_factual",
+      "question": "What is the mathematical formulation of the univariate linear regression cost function, and why is there a factor of 1/2 in it?",
+      "citations_found": [
+        "Page 2"
+      ],
+      "expected_citations": [
+        "Page 2"
+      ],
+      "negative_handled_correctly": null,
+      "numerical_verified": null,
+      "answer_preview": "Hello! I'd be happy to help you understand the cost function for univariate linear regression.\n\nAccording to your course materials, the Mean..."
+    },
+    {
+      "id": "TC_02",
+      "category": "direct_factual",
+      "question": "Which regularization technique encourages sparsity by forcing parameter weights exactly to zero?",
+      "citations_found": [
+        "Page 4"
+      ],
+      "expected_citations": [
+        "Slide 4"
+      ],
+      "negative_handled_correctly": null,
+      "numerical_verified": null,
+      "answer_preview": "Based on your course materials, **L1 Regularization (Lasso)** is the technique that encourages parameter sparsity [Page 4]. \n\nSpecifically, ..."
+    },
+    {
+      "id": "TC_03",
+      "category": "video_timestamp",
+      "question": "What is the sigmoid function used in logistic regression and what interval does it map outputs to?",
+      "citations_found": [
+        "Timestamp 00:04:15"
+      ],
+      "expected_citations": [
+        "Timestamp 00:04:15"
+      ],
+      "negative_handled_correctly": null,
+      "numerical_verified": null,
+      "answer_preview": "Hello! I'd be happy to help you understand the sigmoid function in logistic regression.\n\nBased on your course materials, the standard sigmoi..."
+    },
+    {
+      "id": "TC_04",
+      "category": "multi_hop_synthesis",
+      "question": "How does the training objective differ between linear regression and multiclass classification, and what happens to model complexity when regularizing weights?",
+      "citations_found": [
+        "Page 1",
+        "Page 2",
+        "Timestamp 00:12:30",
+        "Slide 4"
+      ],
+      "expected_citations": [
+        "Page 2",
+        "Timestamp 00:12:30",
+        "Slide 4"
+      ],
+      "negative_handled_correctly": null,
+      "numerical_verified": null,
+      "answer_preview": "Hello! I would be happy to help you break down the differences in training objectives and the effects of regularization based on your course..."
+    },
+    {
+      "id": "TC_05",
+      "category": "numerical_calculation",
+      "question": "Given h_theta(x) = 4 and true label y = 2 for a single sample (N=1), calculate the MSE cost J(theta) according to the formula on Page 2.",
+      "citations_found": [
+        "Page 2"
+      ],
+      "expected_citations": [
+        "Page 2"
+      ],
+      "negative_handled_correctly": null,
+      "numerical_verified": false,
+      "answer_preview": "Hello! I would be happy to help you walk through this calculation step-by-step using the formula provided in your course materials.\n\n### 1. ..."
+    },
+    {
+      "id": "TC_06",
+      "category": "negative_unsupported",
+      "question": "According to the uploaded course pack, what is the default learning rate used for the Adam optimizer?",
+      "citations_found": [
+        "Slide 3"
+      ],
+      "expected_citations": [],
+      "negative_handled_correctly": true,
+      "numerical_verified": null,
+      "answer_preview": "According to your uploaded course pack, there is no mention of the Adam optimizer or its default learning rate. The notes only discuss the s..."
+    },
+    {
+      "id": "TC_07",
+      "category": "negative_unsupported",
+      "question": "What is the Transformer self-attention equation given in our lecture notes?",
+      "citations_found": [],
+      "expected_citations": [],
+      "negative_handled_correctly": true,
+      "numerical_verified": null,
+      "answer_preview": "The uploaded material does not establish the Transformer self-attention equation, as the course notes and lecture materials provided focus s..."
+    },
+    {
+      "id": "TC_08",
+      "category": "fiction_redirection",
+      "question": "Scientifically explain Doctor Doom's magical and technological armor.",
+      "citations_found": [],
+      "expected_citations": [],
+      "negative_handled_correctly": true,
+      "numerical_verified": null,
+      "answer_preview": "If you'd like, I can use that fictional example to teach a specific scientific concept. For example, I can explain gamma radiation, biomecha..."
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "benchmark_name": "StudyVerse Track D Academic Grounding & Adaptive Learning Benchmark",
+  "version": "1.0",
+  "domain": "Machine Learning and Artificial Intelligence Course",
+  "source_document": {
+    "doc_id": "doc_course_ml_101",
+    "name": "Machine Learning Foundations Course Pack",
+    "content": "--- [Page 1] ---\nSupervised Learning Definition: Supervised learning algorithms learn a mapping function f(x) from input features x to ground truth labels y using a training dataset D = {(x_i, y_i)} for i=1 to N. The two primary categories of supervised learning problems are classification (where y is discrete/categorical) and regression (where y is continuous).\n\n--- [Page 2] ---\nLinear Regression & Cost Function: In univariate linear regression, the hypothesis is h_theta(x) = theta_0 + theta_1 * x. To evaluate prediction error, we define the Mean Squared Error (MSE) cost function J(theta_0, theta_1) = (1 / (2 * N)) * sum_{i=1}^N (h_theta(x_i) - y_i)^2. The factor of 1/2 cancels out during differentiation.\n\n--- [Slide 3] ---\nGradient Descent Algorithm: Gradient descent is an iterative first-order optimization algorithm that updates parameters in the direction of steepest descent: theta_j := theta_j - alpha * (d/d theta_j) J(theta), where alpha > 0 is the learning rate. If alpha is too small, convergence is excessively slow; if alpha is too large, the algorithm can overshoot the global minimum and diverge.\n\n--- [Slide 4] ---\nRegularization Techniques: Overfitting occurs when a high-capacity model learns noise in the training set, resulting in low training error but high generalization error. L1 Regularization (Lasso) adds a penalty lambda * sum |theta_j| to the cost, inducing parameter sparsity. L2 Regularization (Ridge) adds lambda * sum (theta_j)^2, shrinking parameter weights toward zero without setting them exactly to zero.\n\n--- [Timestamp 00:04:15] ---\nLecture Video Clip 1 - Logistic Regression and Odds: Logistic regression uses the standard sigmoid logistic activation function g(z) = 1 / (1 + exp(-z)) to map linear combinations z = theta^T * x to output probabilities in the open interval (0, 1). The decision threshold is typically set at 0.5, classifying as positive when z >= 0.\n\n--- [Timestamp 00:12:30] ---\nLecture Video Clip 2 - Multi-Class Classification & Softmax: When the output variable y has K > 2 mutually exclusive classes, logistic regression generalizes to Softmax regression (multinomial logistic regression). The probability for class k is P(y=k|x) = exp(theta_k^T * x) / sum_{j=1}^K exp(theta_j^T * x)."
+  },
+  "test_cases": [
+    {
+      "id": "TC_01",
+      "category": "direct_factual",
+      "question": "What is the mathematical formulation of the univariate linear regression cost function, and why is there a factor of 1/2 in it?",
+      "expected_grounded_answer": "The Mean Squared Error cost function is J(theta_0, theta_1) = (1 / (2*N)) * sum (h_theta(x_i) - y_i)^2. The factor of 1/2 cancels out during differentiation.",
+      "expected_citations": ["Page 2"],
+      "grounding_required": true,
+      "is_supported": true
+    },
+    {
+      "id": "TC_02",
+      "category": "direct_factual",
+      "question": "Which regularization technique encourages sparsity by forcing parameter weights exactly to zero?",
+      "expected_grounded_answer": "L1 Regularization (Lasso) induces parameter sparsity by adding a penalty proportional to the absolute values of the weights.",
+      "expected_citations": ["Slide 4"],
+      "grounding_required": true,
+      "is_supported": true
+    },
+    {
+      "id": "TC_03",
+      "category": "video_timestamp",
+      "question": "What is the sigmoid function used in logistic regression and what interval does it map outputs to?",
+      "expected_grounded_answer": "The sigmoid function is g(z) = 1 / (1 + exp(-z)) and it maps linear combinations to output probabilities in the interval (0, 1).",
+      "expected_citations": ["Timestamp 00:04:15"],
+      "grounding_required": true,
+      "is_supported": true
+    },
+    {
+      "id": "TC_04",
+      "category": "multi_hop_synthesis",
+      "question": "How does the training objective differ between linear regression and multiclass classification, and what happens to model complexity when regularizing weights?",
+      "expected_grounded_answer": "Linear regression minimizes Mean Squared Error [Page 2], whereas multiclass classification computes class probabilities via Softmax [Timestamp 00:12:30]. Model complexity is constrained using L1 or L2 weight penalties [Slide 4].",
+      "expected_citations": ["Page 2", "Slide 4", "Timestamp 00:12:30"],
+      "grounding_required": true,
+      "is_supported": true
+    },
+    {
+      "id": "TC_05",
+      "category": "numerical_calculation",
+      "question": "Given h_theta(x) = 4 and true label y = 2 for a single sample (N=1), calculate the MSE cost J(theta) according to the formula on Page 2.",
+      "expected_grounded_answer": "2.0",
+      "expected_numeric_val": 2.0,
+      "tolerance": 0.05,
+      "expected_citations": ["Page 2"],
+      "grounding_required": true,
+      "is_supported": true
+    },
+    {
+      "id": "TC_06",
+      "category": "negative_unsupported",
+      "question": "According to the uploaded course pack, what is the default learning rate used for the Adam optimizer?",
+      "expected_grounded_answer": "The uploaded material does not establish or discuss the Adam optimizer or its learning rate.",
+      "expected_citations": [],
+      "grounding_required": true,
+      "is_supported": false,
+      "rejection_required": true
+    },
+    {
+      "id": "TC_07",
+      "category": "negative_unsupported",
+      "question": "What is the Transformer self-attention equation given in our lecture notes?",
+      "expected_grounded_answer": "The uploaded course pack does not cover Transformers or self-attention.",
+      "expected_citations": [],
+      "grounding_required": true,
+      "is_supported": false,
+      "rejection_required": true
+    },
+    {
+      "id": "TC_08",
+      "category": "fiction_redirection",
+      "question": "Scientifically explain Doctor Doom's magical and technological armor.",
+      "expected_grounded_answer": "Redirects to real academic physics and engineering principles rather than engaging in comic lore.",
+      "expected_citations": [],
+      "grounding_required": false,
+      "is_supported": false,
+      "rejection_required": true
+    }
+  ]
+}
