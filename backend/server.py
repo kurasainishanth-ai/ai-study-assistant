@@ -1,6 +1,6 @@
 import sys
 import os
-import tempfile
+import asyncio
 import time
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -8,13 +8,14 @@ from datetime import datetime
 # Ensure backend directory is in sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Query
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Query, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config import get_gemini_client, DEFAULT_MODEL, CONFIGURED_MODEL, GEMINI_API_KEY
 from extractors import extract_content, extract_youtube_content, SUPPORTED_EXTENSIONS
+from extractors.youtube_extractor import ACADEMIC_ONLY_MESSAGE, is_academic_context
 from summarizer import (
     generate_study_summary,
     SUMMARY_STYLES,
@@ -42,6 +43,7 @@ from services.visual_service import explain_visual_diagram, generate_concept_ill
 
 # Initialize SQLite database on startup
 db.init_db()
+db.mark_interrupted_uploads()
 
 app = FastAPI(
     title="StudyVerse AI Platform API",
@@ -125,6 +127,30 @@ def get_friendly_file_type(filename: str) -> str:
     elif ext in [".txt", ".md"]:
         return "Text / Markdown Note"
     return "Document"
+
+
+def _material_is_youtube(material: dict) -> bool:
+    metadata = material.get("metadata") or {}
+    return (
+        material.get("type") == "YouTube Lecture"
+        or bool(metadata.get("youtube_id"))
+        or "youtube.com" in (material.get("source_url") or "").lower()
+        or "youtu.be" in (material.get("source_url") or "").lower()
+    )
+
+
+def _require_academic_sources(source_ids: Optional[str]):
+    """Prevent unvalidated legacy YouTube material from reaching study generation."""
+    if not source_ids:
+        return
+    for source_id in (part.strip() for part in source_ids.split(",")):
+        if not source_id:
+            continue
+        material = db.get_material(source_id)
+        if material and _material_is_youtube(material):
+            metadata = material.get("metadata") or {}
+            if metadata.get("academic_context_validated") is not True:
+                raise HTTPException(status_code=400, detail=ACADEMIC_ONLY_MESSAGE)
 
 
 # =========================================================
@@ -219,73 +245,92 @@ async def reupload_material_binary(doc_id: str, file: UploadFile = File(...)):
     return {"success": True, "message": "File saved for native preview", "filename": persistent_filename}
 
 @app.post("/api/materials/upload")
-async def upload_material(file: UploadFile = File(...)):
-    """Uploads and extracts a study file (PDF, PPTX, DOCX, Image, Text)."""
-    suffix = os.path.splitext(file.filename)[1]
-    doc_id = f"doc_{int(time.time() * 1000)}"
-    
-    # Save a persistent copy in UPLOADS_DIR for side-by-side native viewing
-    persistent_filename = f"{doc_id}_{file.filename}"
+async def upload_material(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Persists the file quickly and extracts it after the upload response."""
+    return await _queue_uploaded_material(file, background_tasks)
+
+@app.post("/api/materials/upload/batch")
+async def upload_materials(background_tasks: BackgroundTasks, files: List[UploadFile] = File(...)):
+    """Queues multiple files for extraction and reports acceptance per file."""
+    if not files:
+        raise HTTPException(status_code=400, detail="Select at least one file to upload.")
+
+    results = []
+    for file in files:
+        try:
+            results.append(await _queue_uploaded_material(file, background_tasks))
+        except HTTPException as exc:
+            results.append({
+                "success": False,
+                "filename": file.filename,
+                "error": exc.detail,
+            })
+        except Exception as exc:
+            results.append({
+                "success": False,
+                "filename": file.filename,
+                "error": str(exc),
+            })
+
+    return {
+        "success": all(result["success"] for result in results),
+        "results": results,
+    }
+
+
+async def _queue_uploaded_material(file: UploadFile, background_tasks: BackgroundTasks):
+    filename = os.path.basename(file.filename or "upload")
+    doc_id = f"doc_{time.time_ns()}"
+    persistent_filename = f"{doc_id}_{filename}"
     persistent_path = os.path.join(UPLOADS_DIR, persistent_filename)
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-        content = await file.read()
-        tmp_file.write(content)
-        tmp_path = tmp_file.name
-
-    # Write persistent copy
     try:
-        with open(persistent_path, "wb") as pf:
-            pf.write(content)
-    except Exception as e:
-        print(f"Warning: Failed to save persistent upload copy: {e}")
+        size_bytes = 0
+        with open(persistent_path, "wb") as uploaded_file:
+            while chunk := await file.read(1024 * 1024):
+                uploaded_file.write(chunk)
+                size_bytes += len(chunk)
 
-    size_kb = round(len(content) / 1024, 1)
-
-    try:
-        extracted = extract_content(tmp_path)
-        extracted["file_name"] = file.filename
-        
         item = {
             "id": doc_id,
-            "name": file.filename,
-            "type": get_friendly_file_type(file.filename),
-            "size_kb": size_kb,
+            "name": filename,
+            "type": get_friendly_file_type(filename),
+            "size_kb": round(size_bytes / 1024, 1),
             "upload_time": datetime.now().strftime("%b %d, %H:%M"),
-            "data": extracted,
-            "status": "Ready",
-            "error": None
+            "data": {"content": "", "total_units": 1, "unit_name": "units"},
+            "status": "Processing",
+            "error": None,
         }
-        db.save_material(item)
-        
-        response_material = {
-            "id": item["id"],
-            "name": item["name"],
-            "type": item["type"],
-            "size_kb": item["size_kb"],
-            "upload_time": item["upload_time"],
-            "status": item["status"]
+        await asyncio.to_thread(db.save_material, item)
+        background_tasks.add_task(_process_uploaded_material, item, persistent_path)
+
+        return {
+            "success": True,
+            "material": {key: item[key] for key in ("id", "name", "type", "size_kb", "upload_time", "status")},
         }
-        return {"success": True, "material": response_material}
-    except Exception as e:
-        err_item = {
-            "id": doc_id,
-            "name": file.filename,
-            "type": get_friendly_file_type(file.filename),
-            "size_kb": size_kb,
-            "upload_time": datetime.now().strftime("%b %d, %H:%M"),
-            "data": None,
-            "status": "Error",
-            "error": str(e)
-        }
-        db.save_material(err_item)
-        raise HTTPException(status_code=400, detail=f"Extraction failed: {str(e)}")
-    finally:
-        if os.path.exists(tmp_path):
+    except Exception as exc:
+        if os.path.exists(persistent_path):
             try:
-                os.remove(tmp_path)
+                os.remove(persistent_path)
             except OSError:
                 pass
+        raise HTTPException(status_code=500, detail=f"Could not save {filename}: {exc}") from exc
+
+
+async def _process_uploaded_material(item: dict, file_path: str):
+    """Extracts one persisted upload and updates its library status."""
+    try:
+        extracted = await asyncio.to_thread(extract_content, file_path)
+        extracted["file_name"] = item["name"]
+        completed_item = {**item, "data": extracted, "status": "Ready", "error": None}
+    except Exception as exc:
+        completed_item = {**item, "data": None, "status": "Error", "error": str(exc)}
+
+    try:
+        # If a user deleted the item while extraction was running, don't recreate it.
+        if await asyncio.to_thread(db.get_material, item["id"]) is not None:
+            await asyncio.to_thread(db.save_material, completed_item)
+    except Exception as exc:
+        print(f"Failed to update upload status for {item['name']}: {exc}")
 
 @app.post("/api/materials/youtube")
 def ingest_youtube_endpoint(req: YouTubeIngestRequest):
@@ -296,6 +341,11 @@ def ingest_youtube_endpoint(req: YouTubeIngestRequest):
 
     try:
         extracted = extract_youtube_content(url)
+        if extracted.get("academic_context_validated") is not True and not is_academic_context(
+            extracted.get("title", ""), extracted.get("author", "")
+        ):
+            raise ValueError(ACADEMIC_ONLY_MESSAGE)
+        extracted["academic_context_validated"] = True
         video_id = extracted["youtube_id"]
         doc_id = f"yt_{video_id}_{int(time.time())}"
         size_kb = round(len(extracted["content"]) / 1024, 1)
@@ -316,7 +366,8 @@ def ingest_youtube_endpoint(req: YouTubeIngestRequest):
                 "duration_formatted": extracted["duration_formatted"],
                 "duration_seconds": extracted["duration_seconds"],
                 "youtube_id": extracted["youtube_id"],
-                "segments": extracted["segments"]
+                "segments": extracted["segments"],
+                "academic_context_validated": True,
             }
         }
         db.save_material(item)
@@ -397,6 +448,7 @@ def generate_notes_endpoint(req: NoteGenerateRequest):
     material = db.get_material(req.doc_id)
     if not material:
         raise HTTPException(status_code=404, detail="Material not found")
+    _require_academic_sources(req.doc_id)
     if material["status"] != "Ready" or not material.get("content"):
         raise HTTPException(status_code=400, detail="Document content is not available or failed extraction")
 
@@ -484,6 +536,7 @@ def delete_note_endpoint(note_id: int):
 def generate_flashcards_endpoint(req: FlashcardGenerateRequest):
     """Generates source-grounded flashcards with SRS metadata."""
     try:
+        _require_academic_sources(req.doc_id)
         cards = generate_flashcards(req.doc_id, count=req.count, difficulty=req.difficulty)
         if not cards:
             raise HTTPException(status_code=422, detail="No flashcards could be generated from the readable document content.")
@@ -517,6 +570,13 @@ def delete_flashcard_endpoint(card_id: int):
 def tutor_chat_endpoint(req: TutorChatRequest):
     """Conversational AI study agent with dynamic response formats."""
     try:
+        source_ids = req.source_doc_id
+        if not source_ids and not req.doc_id.startswith("chat_"):
+            source_ids = req.doc_id
+        elif not source_ids:
+            session = db.get_chat_session(req.doc_id)
+            source_ids = session.get("source_doc_id") if session else None
+        _require_academic_sources(source_ids)
         # ask_ai_tutor is the source-grounded path that records both messages
         # and returns usable citations.  The former agent call discarded this
         # state, making the history endpoint appear broken.
@@ -566,6 +626,7 @@ def clear_tutor_history_endpoint(doc_id: str):
 def generate_quiz_endpoint(req: QuizGenerateRequest):
     """Generates diagnostic quiz questions grounded in study material."""
     try:
+        _require_academic_sources(req.doc_id)
         questions = generate_quiz(req.doc_id, num_questions=req.num_questions, difficulty=req.difficulty)
         if not questions:
             raise HTTPException(status_code=422, detail="No quiz questions could be generated from the readable document content.")
@@ -583,6 +644,7 @@ def get_generated_quiz_endpoint(doc_id: str):
 @app.post("/api/quiz/submit")
 def submit_quiz_endpoint(req: QuizSubmitRequest):
     """Evaluates answers, runs Misconception Detector, and saves attempt in SQLite."""
+    _require_academic_sources(req.doc_id)
     results = evaluate_quiz(req.doc_id, req.questions, req.answers)
     return results
 
@@ -605,6 +667,7 @@ def get_knowledge_map_endpoint(doc_id: str):
 def generate_knowledge_map_endpoint(doc_id: str):
     """Explicitly generates and saves a new source-grounded map."""
     try:
+        _require_academic_sources(doc_id)
         graph = generate_knowledge_map(doc_id)
         if not graph.get("nodes"):
             raise HTTPException(status_code=422, detail=graph.get("empty_reason", "No map could be generated from this material."))

@@ -30,24 +30,30 @@ const getTimeGreeting = (date) => {
 };
 
 const THEMES = {
-  "Matrix Terminal": { bg: "#0d0d0d", surface: "#161616", fg: "#00ff66", muted: "#74d89a", accent: "#00ff66", border: "rgba(0,255,102,.2)" },
-  "Mocha Dark": { bg: "#1e1e2e", surface: "#181825", fg: "#cdd6f4", muted: "#a6adc8", accent: "#cba6f7", border: "rgba(255,255,255,.1)" },
-  "Tokyo Night": { bg: "#1a1b26", surface: "#24283b", fg: "#a9b1d6", muted: "#929bc5", accent: "#7aa2f7", border: "rgba(122,162,247,.2)" },
-  "Cyberpunk 2077": { bg: "#181528", surface: "#221d38", fg: "#00f0ff", muted: "#b2a9df", accent: "#ffe600", border: "rgba(0,240,255,.25)" },
-  "Serika Dark": { bg: "#323437", surface: "#2c2e31", fg: "#d1d0c5", muted: "#aaa99f", accent: "#e2b714", border: "rgba(226,183,20,.2)" },
-  "8008": { bg: "#333a42", surface: "#2b3138", fg: "#e3e6e8", muted: "#bbc0c4", accent: "#f14e6c", border: "rgba(241,78,108,.2)" },
-  "Botanical": { bg: "#1e2522", surface: "#27322c", fg: "#e1e8e3", muted: "#b5c5bb", accent: "#91b493", border: "rgba(145,180,147,.2)" },
-  "Synthwave '84": { bg: "#262335", surface: "#241b2f", fg: "#36f9f6", muted: "#bbbfe7", accent: "#fe4450", border: "rgba(254,68,80,.25)" },
-  "Horizon Sunset": { bg: "#1c1b22", surface: "#2b2a33", fg: "#fbfbfe", muted: "#c1c0cb", accent: "#ff7162", border: "rgba(255,113,98,.2)" },
-  "Olivia Luxe": { bg: "#1c1b1b", surface: "#262424", fg: "#f2efed", muted: "#c4bcb6", accent: "#deaf9d", border: "rgba(222,175,157,.2)" },
-  "Carbon Minimal": { bg: "#161616", surface: "#262626", fg: "#f4f4f4", muted: "#c0c0c0", accent: "#ffffff", border: "rgba(255,255,255,.15)" },
-  "Paper Light": { bg: "#f7f7f9", surface: "#ffffff", fg: "#1e1e2e", muted: "#6c6f85", accent: "#d20f39", border: "rgba(0,0,0,.1)" },
-  "Spider-Man (Classic Hero Comic)": { bg: "#081426", surface: "#12243D", glass: "rgba(18, 36, 61, 0.78)", fg: "#F7FAFF", muted: "#C7D5E8", accent: "#EF233C", glow: "rgba(239, 35, 60, 0.32)", secondary: "#2563EB", highlight: "#FFD84D", border: "rgba(125, 174, 255, 0.24)" },
-  "Ben 10 (Omnitrix Cyber Alien)": { bg: "#121212", surface: "#0B3818", fg: "#FFFFFF", muted: "#d2d8d3", accent: "#00FF41", secondary: "#0B3818", highlight: "#9E9E9E", border: "rgba(158,158,158,.35)" },
+  "Sage Study": { bg: "#E8E9E1", surface: "#F0F0E9", fg: "#26342C", muted: "#4B5A50", accent: "#326449", secondary: "#293B32", highlight: "#66866E", border: "rgba(49, 68, 55, .2)" },
+  "Warm Paper": { bg: "#ECE4D8", surface: "#F3ECE1", fg: "#352E27", muted: "#5D5349", accent: "#854B36", secondary: "#42352C", highlight: "#A47739", border: "rgba(74, 57, 43, .2)" },
+  "Solarized Light": { bg: "#E9E4D6", surface: "#F1EDDF", fg: "#263A3C", muted: "#4E6060", accent: "#28706C", secondary: "#293D3B", highlight: "#98772E", border: "rgba(45, 68, 66, .2)" },
+  "Midnight Slate": { bg: "#191B20", surface: "#252830", fg: "#F1F0EC", muted: "#C5C4BE", accent: "#D3A85C", secondary: "#111318", highlight: "#E8C784", border: "rgba(190, 183, 165, .24)" },
+  "Ocean Focus": { bg: "#14221E", surface: "#20332B", fg: "#F0F4EE", muted: "#C0CEC2", accent: "#79C6A2", secondary: "#0D1713", highlight: "#D6B66D", border: "rgba(145, 190, 160, .25)" },
+  "Plum Dusk": { bg: "#211C27", surface: "#302735", fg: "#F3EDF2", muted: "#CEC1D0", accent: "#D38BAA", secondary: "#17131B", highlight: "#D6AD72", border: "rgba(190, 155, 188, .25)" },
 };
+const DEFAULT_THEME = "Midnight Slate";
+const THEME_DEFAULT_VERSION = "midnight-slate-v1";
+
+const isYouTubeMaterial = (material) => Boolean(
+  material && (
+    material.type === "YouTube Lecture"
+    || material.metadata?.youtube_id
+    || /(?:youtube\.com|youtu\.be)/i.test(material.source_url || "")
+  )
+);
+const canUseAsStudySource = (material) => Boolean(
+  material && material.status === "Ready"
+  && (!isYouTubeMaterial(material) || material.metadata?.academic_context_validated === true)
+);
 
 const applyTheme = (name) => {
-  const t = THEMES[name] || THEMES["Matrix Terminal"];
+  const t = THEMES[name] || THEMES[DEFAULT_THEME];
   const root = document.documentElement;
   const hex = t.accent.replace("#", "");
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
@@ -76,10 +82,34 @@ const applyTheme = (name) => {
     }
     return color;
   };
+  const ensureReadableOnSurface = (color, background, minimum = 3) => {
+    const original = color.replace("#", "").match(/.{2}/g).map((part) => parseInt(part, 16));
+    const bgLuminance = luminanceOf(background);
+    const bgContrast = (value) => (Math.max(value, bgLuminance) + 0.05) / (Math.min(value, bgLuminance) + 0.05);
+    const sourceLuminance = luminanceOf(color);
+    if (bgContrast(sourceLuminance) >= minimum) return color;
+
+    const blackContrast = (bgLuminance + 0.05) / 0.05;
+    const whiteContrast = 1.05 / (bgLuminance + 0.05);
+    const target = blackContrast > whiteContrast ? 0 : 255;
+    for (let step = 1; step <= 100; step += 1) {
+      const amount = step / 100;
+      const candidate = original.map((value) => Math.round(value + (target - value) * amount));
+      const result = `#${candidate.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+      if (bgContrast(luminanceOf(result)) >= minimum) return result;
+    }
+    return target === 0 ? "#000000" : "#FFFFFF";
+  };
   const readableMuted = ensureReadable(ensureReadable(t.muted, t.bg), t.surface);
   const dangerReadable = ensureReadable("#ef4444", t.bg);
   const readableIcon = ensureReadable(t.accent, t.surface, 3);
   const readableHighlight = ensureReadable(t.highlight || t.accent, t.surface, 3);
+  const sidebarSurface = t.secondary || t.surface;
+  const readableSidebarAccent = ensureReadableOnSurface(t.accent, sidebarSurface, 4.5);
+  const sidebarAccentLuminance = luminanceOf(readableSidebarAccent);
+  const sidebarAccentText = (sidebarAccentLuminance + 0.05) / 0.05 >= 1.05 / (sidebarAccentLuminance + 0.05)
+    ? "#17212A"
+    : "#FFFFFF";
   const vars = {
     "--bg": t.bg, "--surface": t.surface,
     "--surface-2": `color-mix(in srgb, ${t.surface} 78%, ${t.fg})`,
@@ -92,6 +122,8 @@ const applyTheme = (name) => {
     "--fg-3": readableMuted,
     "--fg-muted": readableMuted, "--accent": t.accent, "--accent-fg": accentText,
     "--danger-readable": dangerReadable, "--icon": readableIcon, "--highlight": readableHighlight,
+    "--sidebar-fg": "#F8FAFC", "--sidebar-muted": "#D1DCE6", "--sidebar-subtle": "#B8C7D3",
+    "--sidebar-accent": readableSidebarAccent, "--sidebar-accent-fg": sidebarAccentText,
     "--green": t.secondary || t.surface, "--green-l": `color-mix(in srgb, ${t.secondary || t.surface} 76%, ${t.accent})`,
     "--green-fg": t.fg, "--success": "#10b981", "--danger": "#d04735",
     "--danger-bg": "#f8dfd7", "--danger-fg": "#7d3829", "--purple": t.accent,
@@ -855,11 +887,14 @@ function SourceSelectDropdown({ materials, selectedSourceIds, onToggleSource, on
 export default function App() {
   const [view, setView] = useState("home");
   const [greetingTime, setGreetingTime] = useState(() => new Date());
-  const [themeName, setThemeName] = useState(() =>
-    typeof window !== "undefined" && THEMES[window.localStorage.getItem("studyverse-theme")]
-      ? window.localStorage.getItem("studyverse-theme")
-      : "Matrix Terminal"
-  );
+  const [themeName, setThemeName] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_THEME;
+    const storedTheme = window.localStorage.getItem("studyverse-theme");
+    const savedTheme = storedTheme === "Solarized Dark" ? "Plum Dusk" : storedTheme;
+    const defaultVersion = window.localStorage.getItem("studyverse-theme-default-version");
+    if (savedTheme === "Sage Study" && defaultVersion !== THEME_DEFAULT_VERSION) return DEFAULT_THEME;
+    return THEMES[savedTheme] ? savedTheme : DEFAULT_THEME;
+  });
   const [materials, setMaterials] = useState([]);
   const [chats, setChats] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -882,6 +917,7 @@ export default function App() {
   useEffect(() => {
     applyTheme(themeName);
     window.localStorage.setItem("studyverse-theme", themeName);
+    window.localStorage.setItem("studyverse-theme-default-version", THEME_DEFAULT_VERSION);
   }, [themeName]);
 
   const refresh = useCallback(async () => {
@@ -892,20 +928,53 @@ export default function App() {
         api.progress().catch(() => null),
       ]);
       setMaterials(data);
-      setSelected((prev) => prev ?? data[0] ?? null);
+      setSelected((prev) => {
+        if (prev?.is_chat) return prev;
+        if (prev) {
+          const refreshed = data.find((material) => material.id === prev.id);
+          return canUseAsStudySource(refreshed) ? refreshed : null;
+        }
+        return data.find(canUseAsStudySource) ?? null;
+      });
       if (chatsData) setChats(chatsData);
       if (pData !== undefined) setProgressData(pData);
       setProgressLoading(false);
 
       setSelectedSourceIds((prev) => {
         if (!data || data.length === 0) return [];
-        if (prev.length === 0) return data.map((m) => m.id);
-        return prev.filter((id) => data.some((m) => m.id === id));
+        const readyMaterials = data.filter(canUseAsStudySource);
+        if (prev.length === 0) return readyMaterials.map((material) => material.id);
+        return prev.filter((id) => readyMaterials.some((material) => material.id === id));
       });
     } catch (e) { setNotice(e.message); }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const hasProcessingUploads = materials.some((material) => material.status === "Processing");
+  useEffect(() => {
+    if (!hasProcessingUploads) return undefined;
+    const timer = window.setInterval(async () => {
+      try {
+        const data = await api.materials();
+        setMaterials(data);
+        setSelected((prev) => {
+          if (prev?.is_chat) return prev;
+          if (prev) {
+            const refreshed = data.find((material) => material.id === prev.id);
+            return canUseAsStudySource(refreshed) ? refreshed : null;
+          }
+          return data.find(canUseAsStudySource) ?? null;
+        });
+        setSelectedSourceIds((prev) => {
+          const readyMaterials = data.filter(canUseAsStudySource);
+          if (prev.length === 0) return readyMaterials.map((material) => material.id);
+          return prev.filter((id) => readyMaterials.some((material) => material.id === id));
+        });
+      } catch (_) {}
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [hasProcessingUploads]);
 
   const onToggleSource = (id) => {
     setSelectedSourceIds((prev) =>
@@ -914,10 +983,11 @@ export default function App() {
   };
 
   const onSelectAllSources = () => {
-    if (selectedSourceIds.length === materials.length) {
+    const readyMaterials = materials.filter(canUseAsStudySource);
+    if (selectedSourceIds.length === readyMaterials.length) {
       setSelectedSourceIds([]);
     } else {
-      setSelectedSourceIds(materials.map((m) => m.id));
+      setSelectedSourceIds(readyMaterials.map((material) => material.id));
     }
   };
 
@@ -983,10 +1053,26 @@ export default function App() {
     }
   };
 
-  const upload = async (file) => {
-    if (!file) return;
+  const upload = async (files) => {
+    if (!files?.length) return;
     setBusy(true);
-    try { await api.upload(file); await refresh(); setShowUpload(false); setView("library"); }
+    try {
+      const response = await api.uploadMany(files);
+      const results = response.results || [];
+      const succeeded = results.filter((result) => result.success).length;
+      const failed = results.filter((result) => !result.success);
+      await refresh();
+      if (succeeded > 0) {
+        setShowUpload(false);
+        setView("library");
+      }
+      if (failed.length) {
+        const failedNames = failed.map((result) => result.filename).join(", ");
+        setNotice(`${succeeded} of ${files.length} files uploaded and processing. Failed: ${failedNames}`);
+      } else {
+        setNotice(`${succeeded} ${succeeded === 1 ? "file uploaded" : "files uploaded"}. Extraction is running in the background.`);
+      }
+    }
     catch (e) { setNotice(e.message); }
     finally { setBusy(false); }
   };
@@ -1095,7 +1181,7 @@ export default function App() {
 
           <div style={{maxHeight: '220px', overflowY: 'auto', marginTop: '4px'}}>
             {chats.filter(c => c.title && c.title !== "New Chat").length === 0 ? (
-              <small style={{display: 'block', padding: '8px 10px', color: 'var(--fg-3)', fontSize: '11px'}}>No recent chats</small>
+              <small style={{display: 'block', padding: '8px 10px', color: 'var(--sidebar-muted)', fontSize: '11px'}}>No recent chats</small>
             ) : (
               chats.filter(c => c.title && c.title !== "New Chat").map(chat => (
                 <div
@@ -1120,7 +1206,7 @@ export default function App() {
                       </span>
                     </span>
                     {chat.source_name && (
-                      <span style={{fontSize: 10, color: 'var(--fg-3)', paddingLeft: 20, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', width:'100%'}}>
+                      <span style={{fontSize: 10, color: 'var(--sidebar-subtle)', paddingLeft: 20, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', width:'100%'}}>
                         📄 {chat.source_name}
                       </span>
                     )}
@@ -1131,7 +1217,7 @@ export default function App() {
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: 'var(--fg-3)',
+                      color: 'var(--sidebar-subtle)',
                       cursor: 'pointer',
                       padding: '4px',
                       display: 'inline-flex',
@@ -1142,7 +1228,7 @@ export default function App() {
                       flexShrink: 0
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--fg-3)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--sidebar-subtle)'}
                   >
                     <Trash2 size={13} />
                   </button>
@@ -1242,7 +1328,17 @@ export default function App() {
         />
       )}
 
-      <input className="hidden" ref={fileRef} type="file" onChange={(e) => upload(e.target.files?.[0])} />
+      <input
+        className="hidden"
+        ref={fileRef}
+        type="file"
+        multiple
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          e.target.value = "";
+          upload(files);
+        }}
+      />
     </div>
   );
 }
@@ -1337,8 +1433,8 @@ function Home({ materials, selected, choose, go, upload, progressData, progressL
       {materials.length ? (
         <div className="grid">
           {materials.slice(0, 3).map((m) => (
-            <button key={m.id} className={`material${selected?.id === m.id ? " selected" : ""}`} onClick={() => choose(m)}>
-              <FileIcon type={m.type} /><span><b>{m.name}</b><small>{m.type} · {m.size_kb} KB</small></span><ChevronRight size={17} />
+            <button key={m.id} className={`material${selected?.id === m.id ? " selected" : ""}${m.status === "Processing" ? " is-processing" : ""}`} disabled={!canUseAsStudySource(m)} onClick={() => choose(m)} title={!canUseAsStudySource(m) ? "This material is unavailable to study tools" : undefined}>
+              <FileIcon type={m.type} /><span><b>{m.name}</b><small>{m.type} · {m.status === "Processing" ? "Extracting text…" : isYouTubeMaterial(m) && m.metadata?.academic_context_validated !== true ? "Re-add to validate academic content" : `${m.size_kb} KB`}</small></span>{m.status === "Processing" ? <LoaderCircle size={16} className="spin" /> : <ChevronRight size={17} />}
             </button>
           ))}
         </div>
@@ -1404,7 +1500,7 @@ function Library({ materials, selected, choose, refresh, warn, upload, onOpenVid
     try { await api.remove(m.id); await refresh(); } catch (e) { warn(e.message); }
   };
   return (
-    <section className="page">
+    <section className="page library-page">
       <div className="intro">
         <p>Everything you add lives here. Choose one to make it your active study source.</p>
         <button className="btn-primary" onClick={upload}><Plus size={17} />Add material</button>
@@ -1412,15 +1508,22 @@ function Library({ materials, selected, choose, refresh, warn, upload, onOpenVid
       {materials.length ? (
         <div className="list">
           {materials.map((m) => {
-            const isYt = m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url?.includes("youtube") || m.source_url?.includes("youtu.be");
+            const isYt = isYouTubeMaterial(m);
+            const canStudy = canUseAsStudySource(m);
+            const academicBlocked = isYt && m.metadata?.academic_context_validated !== true;
             return (
-              <article key={m.id} onClick={() => choose(m)} className={selected?.id === m.id ? "selected" : ""}>
+              <article
+                key={m.id}
+                onClick={() => canStudy && choose(m)}
+                title={academicBlocked ? "Re-add this video to check whether it meets the academic-content requirements." : undefined}
+                className={`${selected?.id === m.id ? "selected" : ""}${m.status === "Processing" ? " is-processing" : ""}${!canStudy && m.status !== "Processing" ? " is-unavailable" : ""}`}
+              >
                 <FileIcon type={m.type} />
                 <span className="name">
                   <b>{m.name}</b>
                   <small>{m.type} · uploaded {m.upload_time}</small>
                 </span>
-                {isYt && (
+                {isYt && canStudy && (
                   <button
                     type="button"
                     className="btn-ghost"
@@ -1444,7 +1547,10 @@ function Library({ materials, selected, choose, refresh, warn, upload, onOpenVid
                     <Play size={12} fill="#ef4444" /> Watch & Transcripts
                   </button>
                 )}
-                <i className={`status ${m.status?.toLowerCase()}`}>{m.status}</i>
+                <i className={`status ${academicBlocked ? "error" : m.status?.toLowerCase()}`}>
+                  {m.status === "Processing" && <LoaderCircle size={12} className="spin" />}
+                  {academicBlocked ? "Re-add to validate" : m.status}
+                </i>
                 <small className="size">{m.size_kb} KB</small>
                 <button className="btn-icon-danger" onClick={(e) => { e.stopPropagation(); remove(m); }}><Trash2 size={17} /></button>
               </article>
@@ -1482,8 +1588,10 @@ function Studio({
   const [showPreview, setShowPreview] = useState(true);
   const [targetCitation, setTargetCitation] = useState(null);
 
-  const activeDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
-  const activeMaterial = (materials || []).find((m) => m.id === activeDocId) || (!selected?.is_chat ? selected : null);
+  const requestedDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
+  const activeMaterialCandidate = (materials || []).find((m) => m.id === requestedDocId) || (!selected?.is_chat ? selected : null);
+  const activeMaterial = canUseAsStudySource(activeMaterialCandidate) ? activeMaterialCandidate : null;
+  const activeDocId = activeMaterial?.id || null;
 
   const tool = mode ? TOOLS.find((t) => t.id === mode) : null;
   const ToolIcon = tool?.icon;
@@ -1588,7 +1696,7 @@ function Studio({
       <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>ACTIVE SOURCE MATERIAL</small>
       
       <SourceSelectDropdown
-        materials={materials}
+        materials={materials.filter(canUseAsStudySource)}
         selectedSourceIds={selectedSourceIds}
         onToggleSource={onToggleSource}
         onSelectAll={onSelectAllSources}
@@ -1733,8 +1841,10 @@ function Tutor({
   const [targetCitation, setTargetCitation] = useState(null);
   const scrollRef = useRef(null);
 
-  const activeDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
-  const activeMaterial = (materials || []).find((m) => m.id === activeDocId) || (!selected?.is_chat ? selected : null);
+  const requestedDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
+  const activeMaterialCandidate = (materials || []).find((m) => m.id === requestedDocId) || (!selected?.is_chat ? selected : null);
+  const activeMaterial = canUseAsStudySource(activeMaterialCandidate) ? activeMaterialCandidate : null;
+  const activeDocId = activeMaterial?.id || null;
 
   useEffect(() => {
     let live = true;
@@ -1831,7 +1941,7 @@ function Tutor({
             <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
             
             <SourceSelectDropdown
-              materials={materials}
+              materials={materials.filter(canUseAsStudySource)}
               selectedSourceIds={selectedSourceIds}
               onToggleSource={onToggleSource}
               onSelectAll={onSelectAllSources}
@@ -2538,12 +2648,12 @@ function UploadModal({ busy, close, choose, sample, onIngestYoutube }) {
         {tab === "file" ? (
           <div>
             <p style={{ color: 'var(--fg-2)', fontSize: 13, marginBottom: 16 }}>
-              PDFs, slide decks (PPTX), Word documents, images, and text notes.
+              Select one or more PDFs, slide decks (PPTX), Word documents, images, or text notes.
             </p>
             <button className="drop" disabled={busy} onClick={choose}>
               {busy ? <LoaderCircle className="spin" size={27} /> : <Upload size={27} />}
-              <b>{busy ? "Adding material…" : "Choose a file"}</b>
-              <small>or drag and drop it here</small>
+              <b>{busy ? "Adding materials…" : "Choose files"}</b>
+              <small>Select multiple files in the file picker</small>
             </button>
             <button className="btn-link sample" disabled={busy} onClick={sample}>
               Try with sample notes <ChevronRight size={16} />
@@ -2552,7 +2662,7 @@ function UploadModal({ busy, close, choose, sample, onIngestYoutube }) {
         ) : (
           <div>
             <p style={{ color: 'var(--fg-2)', fontSize: 13, marginBottom: 12 }}>
-              Paste any lecture or educational video URL. We will automatically ingest, extract timestamped transcript units, and ground all study materials in it.
+              Only academic and instructional videos are accepted, such as course lectures, lessons, tutorials, and subject-focused explainers. Entertainment, movie trailers, music, gaming, reactions, and other non-academic videos are rejected before transcript retrieval.
             </p>
 
             <form onSubmit={handleYtSubmit}>

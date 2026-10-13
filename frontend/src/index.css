@@ -5,25 +5,30 @@
    ================================================================ */
 :root {
   /* Surface */
-  --bg:         #f4f3ed;
-  --surface:    #fbfaf6;
-  --surface-2:  #f0efe9;
-  --surface-3:  #e6efe6;
-  --border:     #dddcd4;
-  --border-l:   #e6e4dc;
+  --bg:         #0f172a;
+  --surface:    #1e293b;
+  --surface-2:  #29364a;
+  --surface-3:  #263c50;
+  --border:     rgba(148, 163, 184, .28);
+  --border-l:   rgba(148, 163, 184, .22);
 
   /* Text */
-  --fg:         #25332d;
-  --fg-2:       #526057;
-  --fg-3:       #78847c;
-  --fg-muted:   #a0a8a3;
+  --fg:         #f8fafc;
+  --fg-2:       #cbd5e1;
+  --fg-3:       #a8b5c7;
+  --fg-muted:   #cbd5e1;
 
   /* Accent */
-  --accent:     #e4b968;
-  --accent-fg:  #25332d;
-  --green:      #17372f;
-  --green-l:    #285047;
-  --green-fg:   #c4d0ca;
+  --accent:     #38bdf8;
+  --accent-fg:  #0b1220;
+  --green:      #0b1220;
+  --green-l:    #173855;
+  --green-fg:   #e2eaf3;
+  --sidebar-fg: #f8fafc;
+  --sidebar-muted: #d1dce6;
+  --sidebar-subtle: #b8c7d3;
+  --sidebar-accent: #38bdf8;
+  --sidebar-accent-fg: #17212a;
 
   /* Semantic */
   --success:    #10b981;
@@ -506,6 +511,8 @@ header h1 {
   transition: border-color .15s, box-shadow .15s;
 }
 .material:hover { border-color: #b8c4ba; }
+.material:disabled { cursor: wait; opacity: .78; }
+.material.is-processing { border-color: color-mix(in srgb, var(--icon) 34%, var(--border)); }
 .material.selected {
   border-color: #688674;
   box-shadow: 0 0 0 2px #d3dfd3;
@@ -613,6 +620,18 @@ header h1 {
   font-style: normal;
 }
 .status.error { background: #f7dcd6; color: #9d4936; }
+.status.processing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--accent) 15%, var(--glass-bg));
+  color: var(--accent);
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+.list article.is-processing { cursor: progress; }
+.list article.is-processing:hover { background: color-mix(in srgb, var(--accent) 7%, var(--glass-bg)) !important; }
+.list article.is-unavailable { cursor: not-allowed; opacity: .76; }
+.list article.is-unavailable:hover { background: var(--glass-bg) !important; }
 .size { font-size: 11px; color: var(--fg-muted); width: 55px; }
 
 /* ================================================================
@@ -1856,4 +1875,307 @@ main::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 72%
 @media (max-width: 460px) {
   .hero { padding: 28px 21px; }
   .hero h2 { font-size: 32px; }
+}
+
+/* Frosted glass sidebar with soft, theme-aware ambient lighting. */
+.shell > aside {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden auto;
+  border-right: 1px solid color-mix(in srgb, var(--glass-border) 82%, transparent);
+  background: linear-gradient(155deg,
+    color-mix(in srgb, var(--green) 91%, var(--glass-bg)),
+    color-mix(in srgb, var(--glass-bg) 46%, var(--green)) 54%,
+    color-mix(in srgb, var(--green) 94%, var(--surface)));
+  box-shadow: 10px 0 36px rgba(0, 0, 0, .16), inset -1px 0 0 color-mix(in srgb, #fff 7%, transparent);
+  backdrop-filter: blur(22px) saturate(155%);
+  -webkit-backdrop-filter: blur(22px) saturate(155%);
+}
+.shell > aside::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 12% 0%, color-mix(in srgb, var(--accent) 23%, transparent), transparent 36%),
+    radial-gradient(ellipse at 88% 100%, color-mix(in srgb, var(--highlight) 18%, transparent), transparent 38%),
+    linear-gradient(180deg, color-mix(in srgb, #fff 4%, transparent), transparent 34%, color-mix(in srgb, #000 8%, transparent));
+  opacity: .9;
+  pointer-events: none;
+}
+.shell > aside > * { position: relative; }
+.shell > aside { color: var(--sidebar-fg); }
+.shell > aside .label,
+.shell > aside .theme-picker-label { color: var(--sidebar-muted) !important; }
+.shell > aside .nav { color: var(--sidebar-muted); }
+.shell > aside .theme-picker {
+  color: var(--sidebar-fg);
+  border-color: color-mix(in srgb, var(--sidebar-muted) 44%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--glass-bg) 30%, var(--green)), color-mix(in srgb, var(--green) 82%, transparent));
+}
+.shell > aside .theme-picker-swatch {
+  background: var(--sidebar-accent);
+  box-shadow: 0 0 11px color-mix(in srgb, var(--sidebar-accent) 58%, transparent);
+}
+.shell > aside .theme-picker:hover,
+.shell > aside .theme-picker[aria-expanded="true"] {
+  border-color: var(--sidebar-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sidebar-accent) 20%, transparent), 0 8px 22px rgba(0, 0, 0, .2);
+}
+.shell > aside .theme-picker:focus-visible { outline-color: var(--sidebar-accent); }
+.shell > aside .brand {
+  position: relative;
+  text-shadow: 0 1px 18px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.shell > aside .brand::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--glass-border) 82%, transparent), transparent);
+}
+.shell > aside .nav {
+  border: 1px solid transparent;
+  transition: color .2s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease, transform .22s ease;
+}
+.shell > aside .nav:hover {
+  transform: translateX(2px);
+  border-color: color-mix(in srgb, var(--glass-border) 65%, transparent);
+  background: linear-gradient(105deg, color-mix(in srgb, var(--sidebar-accent) 18%, transparent), color-mix(in srgb, var(--glass-bg) 15%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent), 0 0 20px -10px color-mix(in srgb, var(--sidebar-accent) 70%, transparent);
+  color: #fff;
+}
+.shell > aside .nav.on {
+  border-color: color-mix(in srgb, var(--sidebar-accent) 48%, var(--glass-border));
+  background: linear-gradient(105deg, color-mix(in srgb, var(--sidebar-accent) 21%, var(--green)), color-mix(in srgb, var(--glass-bg) 32%, var(--green)));
+  box-shadow: inset 3px 0 0 var(--sidebar-accent), 0 5px 20px -10px color-mix(in srgb, var(--sidebar-accent) 72%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  color: #fff;
+}
+.shell > aside .tip {
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--glass-bg) 76%, var(--green)), color-mix(in srgb, var(--green) 84%, transparent));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .17), 0 0 18px -10px var(--accent-glow), inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+.shell > aside .tip b { color: var(--sidebar-fg); }
+.shell > aside .tip span { color: var(--sidebar-muted); opacity: 1; }
+.shell > aside .add {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-fg);
+  border: 1px solid color-mix(in srgb, var(--sidebar-accent) 76%, #fff);
+  box-shadow: 0 5px 18px -8px color-mix(in srgb, var(--sidebar-accent) 78%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 26%, transparent);
+}
+.shell > aside .add:hover { filter: brightness(1.08); }
+.shell > aside .theme-picker-wrap { z-index: 2; }
+@media (prefers-reduced-motion: reduce) {
+  .shell > aside .nav { transition: none; }
+  .shell > aside .nav:hover { transform: none; }
+}
+
+/* Ambient glass lighting for Library and AI Tutor. */
+.library-page,
+.tutor-page {
+  position: relative;
+  isolation: isolate;
+}
+.library-page::before,
+.tutor-page::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -48px -8% 8%;
+  background:
+    radial-gradient(ellipse at 8% 12%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 38%),
+    radial-gradient(ellipse at 92% 22%, color-mix(in srgb, var(--highlight) 13%, transparent), transparent 34%),
+    radial-gradient(ellipse at 50% 90%, color-mix(in srgb, var(--green) 18%, transparent), transparent 48%);
+  filter: blur(34px);
+  opacity: .82;
+  pointer-events: none;
+}
+.library-page .intro {
+  position: relative;
+  padding: 17px 20px;
+  margin-bottom: 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  background: linear-gradient(125deg, color-mix(in srgb, var(--glass-bg) 94%, var(--surface)), color-mix(in srgb, var(--surface) 68%, transparent));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .2), 0 0 22px -8px var(--accent-glow), inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+  backdrop-filter: blur(16px) saturate(165%);
+  -webkit-backdrop-filter: blur(16px) saturate(165%);
+}
+.library-page .list {
+  overflow: hidden;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: 16px;
+  background: var(--glass-bg) !important;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .24), 0 0 28px -8px var(--accent-glow), inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+  backdrop-filter: blur(18px) saturate(175%);
+  -webkit-backdrop-filter: blur(18px) saturate(175%);
+}
+.library-page .list article {
+  position: relative;
+  background: color-mix(in srgb, var(--glass-bg) 88%, var(--surface)) !important;
+  border-bottom-color: color-mix(in srgb, var(--glass-border) 76%, transparent);
+  transition: background .2s ease, box-shadow .22s ease, transform .22s ease;
+}
+.library-page .list article:hover,
+.library-page .list article.selected {
+  z-index: 1;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--accent) 13%, var(--glass-bg)), var(--glass-bg)) !important;
+  box-shadow: inset 3px 0 0 var(--accent), 0 0 26px -10px var(--accent-glow);
+}
+.library-page .list article > svg { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--icon) 35%, transparent)); }
+
+.tutor-page .chat-container {
+  position: relative;
+  padding: 22px;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--glass-bg) 90%, var(--surface)), color-mix(in srgb, var(--surface) 78%, transparent));
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .24), 0 0 28px -8px var(--accent-glow), inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+  backdrop-filter: blur(18px) saturate(175%);
+  -webkit-backdrop-filter: blur(18px) saturate(175%);
+}
+.tutor-page .chat-empty svg { color: var(--icon); filter: drop-shadow(0 0 14px var(--accent-glow)); }
+.tutor-page .msg {
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--glass-bg) 88%, var(--surface)), color-mix(in srgb, var(--surface) 72%, transparent));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .2), inset 0 1px 0 color-mix(in srgb, var(--fg) 9%, transparent);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  animation: studioEnter .3s ease-out both;
+}
+.tutor-page .msg.you {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--glass-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 90%, var(--surface)), color-mix(in srgb, var(--accent) 72%, var(--surface))) !important;
+  color: var(--accent-fg);
+  box-shadow: 0 10px 28px -8px var(--accent-glow), inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent);
+}
+.tutor-page .msg.you .md-body,
+.tutor-page .msg.you .md-body code { color: var(--accent-fg); }
+.tutor-page .chat-input { margin-top: 16px; }
+.tutor-page .preview-split-panel {
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .27), 0 0 28px -8px var(--accent-glow), inset 0 1px 0 color-mix(in srgb, var(--fg) 9%, transparent);
+}
+.tutor-page .preview-panel-header,
+.tutor-page .preview-panel-search,
+.tutor-page .preview-panel-body {
+  background: color-mix(in srgb, var(--glass-bg) 90%, var(--surface)) !important;
+  color: var(--fg);
+}
+.tutor-page .preview-section-card {
+  background: color-mix(in srgb, var(--glass-bg) 88%, var(--surface)) !important;
+  border-color: var(--glass-border);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fg) 8%, transparent);
+}
+.tutor-page .preview-section-card.highlighted {
+  border-color: var(--accent);
+  box-shadow: 0 0 22px -8px var(--accent-glow), inset 0 1px 0 color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.tutor-page .preview-panel-search input {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border-color: var(--glass-border);
+  color: var(--fg);
+}
+
+/* Keep the app shell fixed while each active page owns its own scroll area. */
+.shell > main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.shell > main > header,
+.shell > main > .notice { flex: 0 0 auto; }
+.shell > main > .page {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  margin: 0 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+/* Tutor history scrolls independently, leaving its composer in view. */
+.shell > main > .tutor-page {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  overflow: hidden;
+  padding-top: 22px;
+  padding-bottom: 18px;
+}
+.shell > main > .tutor-page > div:first-child {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+.shell > main > .tutor-page .source,
+.shell > main > .tutor-page .chat-input { flex: 0 0 auto; }
+.shell > main > .tutor-page .chat-container {
+  flex: 1 1 0;
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.shell > main > .tutor-page.preview-split-layout .preview-split-main > .chat-container {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.shell > main > .tutor-page.preview-split-layout {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 24px;
+}
+.shell > main > .tutor-page.preview-split-layout > .preview-split-panel {
+  position: relative;
+  top: auto;
+  height: 100%;
+  max-height: 100%;
+  flex: 0 1 440px;
+}
+
+@media (max-width: 800px) {
+  .shell {
+    height: 100dvh;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .shell > aside {
+    height: 64px;
+    min-height: 64px;
+    padding: 8px 12px;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  .shell > aside .theme-picker-label,
+  .shell > aside .theme-picker-wrap,
+  .shell > aside > div[style*="margin-top"] { display: none; }
+  .shell > main { height: auto; min-height: 0; }
+  .shell > main > header { height: auto; }
+  .shell > main > .page { padding: 20px 5% 28px; }
+  .shell > main > .tutor-page { padding-top: 16px; padding-bottom: 16px; }
+  .shell > main > .tutor-page.preview-split-layout { flex-direction: column; gap: 14px; }
+  .shell > main > .tutor-page.preview-split-layout > .preview-split-main { flex: 1 1 0; width: 100%; }
+  .shell > main > .tutor-page.preview-split-layout > .preview-split-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: min(36dvh, 300px);
+    flex: 0 0 min(36dvh, 300px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell > main { scroll-behavior: auto; }
 }

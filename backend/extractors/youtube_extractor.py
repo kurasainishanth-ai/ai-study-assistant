@@ -3,6 +3,49 @@ import requests
 from typing import List, Dict, Any, Optional
 from youtube_transcript_api import YouTubeTranscriptApi
 
+
+ACADEMIC_CONTEXT_HINTS = (
+    "academic", "education", "educational", "lecture", "lesson", "tutorial", "course",
+    "classroom", "teacher", "professor", "university", "college", "school", "study",
+    "learning", "learn", "explained", "explanation", "introduction to", "fundamentals",
+    "principles of", "exam prep", "revision", "curriculum", "syllabus", "worked example",
+    "problem solving", "mathematics", "math", "algebra", "calculus", "equation", "geometry",
+    "statistics", "physics", "chemistry", "biology", "anatomy", "neuroscience", "medicine",
+    "computer science", "programming", "coding", "engineering", "economics", "history",
+    "geography", "literature", "grammar", "linguistics", "philosophy", "psychology",
+    "sociology", "political science", "climate science", "quantum", "neural network",
+    "artificial intelligence", "machine learning", "research methods", "data science",
+)
+ACADEMIC_CHANNEL_HINTS = (
+    "khan academy", "3blue1brown", "crash course", "mit opencourseware", "openstax",
+    "ted-ed", "ted ed", "numberphile", "freecodecamp", "cs50", "coursera", "edx",
+)
+NON_ACADEMIC_FORMAT_HINTS = (
+    "official trailer", "movie trailer", "film trailer", "teaser trailer", "official teaser",
+    "full movie", "full film", "official music video", "music video", "official audio",
+    "soundtrack", "gameplay", "let's play", "lets play", "gaming stream", "reaction video",
+    "prank video", "daily vlog", "sports highlights", "marvel", "avengers",
+    "doomsday", "superhero", "cinematic universe", "box office",
+)
+ACADEMIC_ONLY_MESSAGE = (
+    "This video does not appear to be academic or instructional. StudyVerse only accepts "
+    "course material such as lectures, lessons, tutorials, and subject-focused explainers."
+)
+
+
+def is_academic_context(title: str, author: str = "") -> bool:
+    """Conservatively require clear educational intent before fetching a transcript."""
+    normalized_title = " ".join((title or "").casefold().split())
+    normalized_author = " ".join((author or "").casefold().split())
+    if not normalized_title or normalized_title.startswith("youtube video ("):
+        return False
+    if any(hint in normalized_title for hint in NON_ACADEMIC_FORMAT_HINTS):
+        return False
+    return (
+        any(hint in normalized_title for hint in ACADEMIC_CONTEXT_HINTS)
+        or any(hint in normalized_author for hint in ACADEMIC_CHANNEL_HINTS)
+    )
+
 def extract_youtube_id(url_or_id: str) -> Optional[str]:
     """
     Extracts the 11-character YouTube video ID from various URL formats or raw ID.
@@ -87,6 +130,10 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
     author = metadata["author"]
     thumbnail_url = metadata["thumbnail_url"]
     video_url = metadata["video_url"]
+
+    # Reject entertainment and ambiguous videos before requesting captions.
+    if not is_academic_context(title, author):
+        raise ValueError(ACADEMIC_ONLY_MESSAGE)
 
     target_langs = languages or ["en", "en-US", "en-GB", "hi"]
 
@@ -207,4 +254,5 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
         "content": full_content,
         "file_name": f"{title} (YouTube)",
         "language": chosen_transcript.language if hasattr(chosen_transcript, "language") else "en",
+        "academic_context_validated": True,
     }

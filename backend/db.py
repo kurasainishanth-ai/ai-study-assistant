@@ -157,6 +157,17 @@ def init_db():
 
         conn.commit()
 
+
+def mark_interrupted_uploads():
+    """Mark uploads left mid-processing by a previous server run as failed."""
+    init_db()
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE materials SET status = ?, error = ? WHERE status = ?",
+            ("Error", "Processing was interrupted. Upload this file again.", "Processing"),
+        )
+        conn.commit()
+
 # --- Material Operations ---
 
 def save_material(item: Dict[str, Any]):

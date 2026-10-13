@@ -1,26 +1,32 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 from PIL import Image
-import io
 
 
-def _needs_ocr(text: str) -> bool:
-    """Heuristic to determine if a page needs OCR due to math/corruption or low text density."""
-    if len(text.strip()) < 50:
-        return True
-    if '�' in text:
-        return True
-    lines = [l.strip() for l in text.split('\n') if l.strip()]
-    if not lines:
-        return True
-    # PyMuPDF flattens complex math equations into multiple 1-2 character lines.
-    short_lines = sum(1 for l in lines if len(l) <= 3)
-    if len(lines) > 10 and (short_lines / len(lines)) > 0.15:
-        return True
-    # High density of symbols that are often corrupted or present in math
-    suspect_chars = sum(text.count(c) for c in ['^', '~', '\\', '|', '_', '{', '}'])
-    if suspect_chars > 30:
-        return True
-    return False
+def _needs_ocr(text: str, has_scanned_image: bool = False) -> bool:
+    """Only OCR image-backed pages with missing or clearly corrupted text."""
+    cleaned = text.strip()
+    # Empty pages and sparse vector-only pages cannot benefit from image OCR.
+    # Scanned pages usually have a full-page raster image and little/no text.
+    return has_scanned_image and (len(cleaned) < 80 or "�" in cleaned)
+
+
+def _has_scanned_page_image(page, images) -> bool:
+    """Return true when raster images cover enough of the page to indicate a scan."""
+    if not images:
+        return False
+    try:
+        page_area = float(page.rect.get_area())
+        if page_area <= 0:
+            return False
+        image_area = sum(
+            rect.get_area()
+            for image in images
+            for rect in page.get_image_rects(image[0])
+        )
+        return image_area / page_area >= 0.25
+    except (AttributeError, TypeError, ValueError):
+        return False
 
 def extract_pdf_content(file_path: str) -> dict:
     """Extracts text content, handles scanned/handwritten pages via OCR."""
@@ -33,50 +39,58 @@ def extract_pdf_content(file_path: str) -> dict:
         
         doc = fitz.open(file_path)
         total_pages = len(doc)
-        extracted_text = []
+        extracted_text = {}
+        ocr_page_numbers = set()
         page_images = []
-        
-        for idx, page in enumerate(doc, start=1):
-            text = page.get_text() or ""
-            
-            if _needs_ocr(text):
-                try:
-                    # Render the page to an image
-                    pix = page.get_pixmap(dpi=150)
-                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                    
-                    # Run OCR
-                    ocr_text = ocr_image(img)
-                    
-                    if ocr_text and "[OCR Failed" not in ocr_text:
-                        extracted_text.append(f"--- [Page {idx} (OCR)] ---\n{ocr_text.strip()}")
-                    else:
+
+        ocr_pool = ThreadPoolExecutor(max_workers=2)
+        pending_ocr = []
+        try:
+            for idx, page in enumerate(doc, start=1):
+                text = page.get_text() or ""
+                images = page.get_images(full=True)
+                has_scanned_image = _has_scanned_page_image(page, images)
+
+                if _needs_ocr(text, has_scanned_image=has_scanned_image):
+                    try:
+                        pix = page.get_pixmap(dpi=150)
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        pending_ocr.append((idx, text, ocr_pool.submit(ocr_image, img)))
+                        if len(pending_ocr) == 2:
+                            _collect_ocr_results(pending_ocr, extracted_text, ocr_page_numbers)
+                            pending_ocr.clear()
+                    except Exception as page_e:
+                        print(f"OCR preparation failed for page {idx}: {page_e}")
                         if text.strip():
-                            extracted_text.append(f"--- [Page {idx}] ---\n{text.strip()}")
-                except Exception as page_e:
-                    print(f"OCR failed for page {idx}: {page_e}")
-                    if text.strip():
-                        extracted_text.append(f"--- [Page {idx}] ---\n{text.strip()}")
-            else:
-                extracted_text.append(f"--- [Page {idx}] ---\n{text.strip()}")
+                            extracted_text[idx] = text.strip()
+                elif text.strip():
+                    extracted_text[idx] = text.strip()
             
             # Check for embedded images (limit to first 10 images across doc)
-            if len(page_images) < 10:
-                images = page.get_images(full=True)
-                for img_idx, img in enumerate(images):
-                    if len(page_images) >= 10:
-                        break
-                    xref = img[0]
-                    base_image = doc.extract_image(xref)
-                    page_images.append({
-                        "page": idx,
-                        "ext": base_image.get("ext", "png"),
-                        "bytes": base_image.get("image"),
-                        "name": f"page_{idx}_img_{img_idx+1}.{base_image.get('ext', 'png')}"
-                    })
+                if len(page_images) < 10:
+                    for img_idx, img in enumerate(images):
+                        if len(page_images) >= 10:
+                            break
+                        xref = img[0]
+                        base_image = doc.extract_image(xref)
+                        page_images.append({
+                            "page": idx,
+                            "ext": base_image.get("ext", "png"),
+                            "bytes": base_image.get("image"),
+                            "name": f"page_{idx}_img_{img_idx+1}.{base_image.get('ext', 'png')}"
+                        })
+
+            if pending_ocr:
+                _collect_ocr_results(pending_ocr, extracted_text, ocr_page_numbers)
+                pending_ocr.clear()
+        finally:
+            ocr_pool.shutdown(wait=True)
 
         doc.close()
-        full_text = "\n\n".join(extracted_text)
+        full_text = "\n\n".join(
+            f"--- [Page {idx}{' (OCR)' if idx in ocr_page_numbers else ''}] ---\n{text}"
+            for idx, text in sorted(extracted_text.items())
+        )
         return {
             "type": "text",
             "total_units": total_pages,
@@ -102,3 +116,19 @@ def extract_pdf_content(file_path: str) -> dict:
             "content": "\n\n".join(extracted_text),
             "images": []
         }
+
+
+def _collect_ocr_results(pending, extracted_text, ocr_page_numbers):
+    """Collect a small OCR batch while preserving page order and fallback text."""
+    for idx, fallback_text, future in pending:
+        try:
+            ocr_text = future.result()
+            if ocr_text and "[OCR Failed" not in ocr_text:
+                extracted_text[idx] = ocr_text.strip()
+                ocr_page_numbers.add(idx)
+            elif fallback_text.strip():
+                extracted_text[idx] = fallback_text.strip()
+        except Exception as page_error:
+            print(f"OCR failed for page {idx}: {page_error}")
+            if fallback_text.strip():
+                extracted_text[idx] = fallback_text.strip()
