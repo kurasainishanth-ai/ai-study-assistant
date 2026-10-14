@@ -13,12 +13,27 @@ SUPPORTED_EXTENSIONS = {
     "text": [".txt", ".md", ".py", ".csv", ".json", ".html", ".rst"]
 }
 
+SUPPORTED_FILE_SUFFIXES = frozenset(
+    extension
+    for extensions in SUPPORTED_EXTENSIONS.values()
+    for extension in extensions
+)
+
+
+def is_supported_file(file_path: str) -> bool:
+    """Return whether a filename is one of the formats the app can extract."""
+    _, ext = os.path.splitext(os.path.basename(file_path).lower())
+    return ext in SUPPORTED_FILE_SUFFIXES
+
 def extract_content(file_path: str) -> dict:
     """Detects file format and extracts content accordingly."""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
     _, ext = os.path.splitext(file_path.lower())
+
+    if ext not in SUPPORTED_FILE_SUFFIXES:
+        raise ValueError(f"Unsupported file type '{ext or 'unknown'}'. Upload a PDF, presentation, Word document, image, or text file.")
     
     if ext in SUPPORTED_EXTENSIONS["pdf"]:
         data = extract_pdf_content(file_path)
@@ -31,7 +46,6 @@ def extract_content(file_path: str) -> dict:
     elif ext in SUPPORTED_EXTENSIONS["text"]:
         data = extract_text_content(file_path)
     else:
-        # Fallback to plain text attempt
         data = extract_text_content(file_path)
         
     data["file_path"] = file_path

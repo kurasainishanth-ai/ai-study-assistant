@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from config import get_gemini_client, DEFAULT_MODEL, CONFIGURED_MODEL, GEMINI_API_KEY
 from extractors import extract_content, extract_youtube_content, SUPPORTED_EXTENSIONS
+from extractors.dispatcher import is_supported_file
 from extractors.youtube_extractor import ACADEMIC_ONLY_MESSAGE
 from summarizer import (
     generate_study_summary,
@@ -94,6 +95,7 @@ class TutorChatRequest(BaseModel):
     message: str
     level: str = "intermediate"  # simple, intermediate, university
     source_doc_id: Optional[str] = None
+    tutor_mode: str = "teaching"  # teaching, learning
 
 class QuizGenerateRequest(BaseModel):
     doc_id: str
@@ -312,6 +314,11 @@ async def upload_materials(background_tasks: BackgroundTasks, files: List[Upload
 
 async def _queue_uploaded_material(file: UploadFile, background_tasks: BackgroundTasks):
     filename = os.path.basename(file.filename or "upload")
+    if not is_supported_file(filename):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Upload a PDF, presentation, Word document, image, or text file.",
+        )
     doc_id = f"doc_{time.time_ns()}"
     persistent_filename = f"{doc_id}_{filename}"
     persistent_path = os.path.join(UPLOADS_DIR, persistent_filename)
@@ -613,7 +620,13 @@ def tutor_chat_endpoint(req: TutorChatRequest):
         # ask_ai_tutor is the source-grounded path that records both messages
         # and returns usable citations.  The former agent call discarded this
         # state, making the history endpoint appear broken.
-        result = ask_ai_tutor(req.doc_id, req.message, req.level, source_doc_id=req.source_doc_id)
+        result = ask_ai_tutor(
+            req.doc_id,
+            req.message,
+            req.level,
+            source_doc_id=req.source_doc_id,
+            tutor_mode=req.tutor_mode,
+        )
         return {
             'chat_id': req.doc_id,
             'content': result.get('answer', ''),
@@ -622,6 +635,7 @@ def tutor_chat_endpoint(req: TutorChatRequest):
             'level': req.level,
             'source_doc_id': result.get('source_doc_id'),
             'source_name': result.get('source_name'),
+            'tutor_mode': result.get('tutor_mode', 'teaching'),
             'raw_agent_response': None
         }
     except GeminiClientAuthError as e:

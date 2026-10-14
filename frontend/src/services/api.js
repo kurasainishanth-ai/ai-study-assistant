@@ -1,12 +1,26 @@
 const BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+const DEFAULT_REQUEST_TIMEOUT_MS = 90000;
 
 async function request(path, options = {}) {
-  const response = await fetch(BASE + path, options);
-  const text = await response.text();
-  let body = null;
-  try { body = text ? JSON.parse(text) : null; } catch { body = text; }
-  if (!response.ok) throw new Error((body && body.detail) || body || "Request failed (" + response.status + ")");
-  return body;
+  const { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(BASE + path, { ...fetchOptions, signal: controller.signal });
+    const text = await response.text();
+    let body = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+    if (!response.ok) throw new Error((body && body.detail) || body || "Request failed (" + response.status + ")");
+    return body;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error("This request took too long. Check that the backend and AI service are responsive, then try again.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 const json = (body) => ({
@@ -60,8 +74,8 @@ export const api = {
   getQuizAttempts: (id) => request("/quiz/attempts/" + encodeURIComponent(id)),
 
   // Tutor & Chats
-  tutor: (id, message, level = "intermediate", sourceDocId = null) =>
-    request("/tutor/chat", json({ doc_id: id, message, level, source_doc_id: sourceDocId })),
+  tutor: (id, message, level = "intermediate", sourceDocId = null, tutorMode = "teaching") =>
+    request("/tutor/chat", json({ doc_id: id, message, level, source_doc_id: sourceDocId, tutor_mode: tutorMode })),
   getTutorHistory: (id) => request("/tutor/history/" + encodeURIComponent(id)),
   clearTutorHistory: (id) =>
     request("/tutor/history/" + encodeURIComponent(id), { method: "DELETE" }),

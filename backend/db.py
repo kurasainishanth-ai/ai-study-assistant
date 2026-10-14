@@ -174,7 +174,85 @@ def init_db():
             )
         """)
 
+        # Durable, structured study events let Tutor connect tool use and
+        # learner-reported outcomes without treating activity as a mistake.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS learner_memory_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_doc_id TEXT,
+                activity_type TEXT NOT NULL,
+                topic TEXT,
+                details TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_learner_memory_source ON learner_memory_events(source_doc_id, id)")
+
         conn.commit()
+
+
+def _record_learning_event(cursor, source_doc_id: Optional[str], activity_type: str,
+                           topic: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+    cursor.execute(
+        "INSERT INTO learner_memory_events (source_doc_id, activity_type, topic, details, created_at) VALUES (?, ?, ?, ?, ?)",
+        (source_doc_id, activity_type, topic, json.dumps(details or {}), datetime.now().isoformat(timespec="seconds")),
+    )
+
+
+def record_learning_event(source_doc_id: Optional[str], activity_type: str,
+                          topic: Optional[str] = None, details: Optional[Dict[str, Any]] = None):
+    """Persist a standalone learning event, such as a Tutor conversation turn."""
+    init_db()
+    with get_connection() as conn:
+        _record_learning_event(conn.cursor(), source_doc_id, activity_type, topic, details)
+        conn.commit()
+
+
+def _delete_tutor_events_for_chat(cursor, chat_id: str):
+    rows = cursor.execute(
+        "SELECT id, details FROM learner_memory_events WHERE activity_type = 'tutor_turn'"
+    ).fetchall()
+    matching_ids = []
+    for row in rows:
+        try:
+            details = json.loads(row["details"]) if row["details"] else {}
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if details.get("chat_id") == chat_id:
+            matching_ids.append(row["id"])
+    if matching_ids:
+        placeholders = ",".join("?" for _ in matching_ids)
+        cursor.execute(f"DELETE FROM learner_memory_events WHERE id IN ({placeholders})", matching_ids)
+
+
+def get_learning_events(source_doc_ids: Optional[List[str]] = None, limit: int = 30) -> List[Dict[str, Any]]:
+    """Return recent persistent study events, optionally scoped to selected sources."""
+    init_db()
+    source_ids = list(dict.fromkeys(item for item in (source_doc_ids or []) if item))
+    with get_connection() as conn:
+        if source_ids:
+            placeholders = ",".join("?" for _ in source_ids)
+            rows = conn.execute(
+                f"SELECT * FROM learner_memory_events WHERE source_doc_id IN ({placeholders}) ORDER BY id DESC LIMIT ?",
+                (*source_ids, max(1, min(int(limit), 100))),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM learner_memory_events ORDER BY id DESC LIMIT ?",
+                (max(1, min(int(limit), 100)),),
+            ).fetchall()
+        events = []
+        for row in rows:
+            try:
+                details = json.loads(row["details"]) if row["details"] else {}
+            except (TypeError, json.JSONDecodeError):
+                details = {}
+            events.append({
+                "id": row["id"], "source_doc_id": row["source_doc_id"],
+                "activity_type": row["activity_type"], "topic": row["topic"],
+                "details": details, "created_at": row["created_at"],
+            })
+        return events
 
 
 def mark_interrupted_uploads():
@@ -240,7 +318,14 @@ def get_all_materials() -> List[Dict[str, Any]]:
     init_db()
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM materials ORDER BY upload_time DESC")
+        content_sql, content_params = _supported_content_select()
+        cursor.execute(f"""
+            SELECT id, name, file_type, size_kb, upload_time,
+                   {content_sql} AS content,
+                   total_units, unit_name, status, error, source_url, metadata_json
+            FROM materials
+            ORDER BY upload_time DESC
+        """, content_params)
         rows = cursor.fetchall()
         materials = []
         for r in rows:
@@ -250,15 +335,24 @@ def get_all_materials() -> List[Dict[str, Any]]:
                     meta = json.loads(r["metadata_json"])
                 except Exception:
                     pass
+            content = r["content"] or ""
+            status = r["status"]
+            error = r["error"]
+            if not _is_supported_material(r["name"], r["file_type"], meta):
+                # Legacy uploads may contain arbitrary binary data stored as text.
+                # Keep the material record, but never send that payload to the UI or AI.
+                content = ""
+                status = "Error"
+                error = "Unsupported file type. Upload a PDF, presentation, Word document, image, or text file."
             materials.append({
                 "id": r["id"],
                 "name": r["name"],
                 "type": r["file_type"],
                 "size_kb": r["size_kb"],
                 "upload_time": r["upload_time"],
-                "status": r["status"],
-                "error": r["error"],
-                "content": r["content"] or "",
+                "status": status,
+                "error": error,
+                "content": content,
                 "total_units": r["total_units"] or 1,
                 "unit_name": r["unit_name"] or "units",
                 "source_url": r["source_url"] if "source_url" in r.keys() else None,
@@ -270,7 +364,14 @@ def get_material(doc_id: str) -> Optional[Dict[str, Any]]:
     init_db()
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM materials WHERE id = ?", (doc_id,))
+        content_sql, content_params = _supported_content_select()
+        cursor.execute(f"""
+            SELECT id, name, file_type, size_kb, upload_time,
+                   {content_sql} AS content,
+                   total_units, unit_name, status, error, source_url, metadata_json
+            FROM materials
+            WHERE id = ?
+        """, (*content_params, doc_id))
         r = cursor.fetchone()
         if not r:
             return None
@@ -280,20 +381,47 @@ def get_material(doc_id: str) -> Optional[Dict[str, Any]]:
                 meta = json.loads(r["metadata_json"])
             except Exception:
                 pass
+        content = r["content"] or ""
+        status = r["status"]
+        error = r["error"]
+        if not _is_supported_material(r["name"], r["file_type"], meta):
+            content = ""
+            status = "Error"
+            error = "Unsupported file type. Upload a PDF, presentation, Word document, image, or text file."
         return {
             "id": r["id"],
             "name": r["name"],
             "type": r["file_type"],
             "size_kb": r["size_kb"],
             "upload_time": r["upload_time"],
-            "status": r["status"],
-            "error": r["error"],
-            "content": r["content"] or "",
+            "status": status,
+            "error": error,
+            "content": content,
             "total_units": r["total_units"] or 1,
             "unit_name": r["unit_name"] or "units",
             "source_url": r["source_url"] if "source_url" in r.keys() else None,
             "metadata": meta
         }
+
+
+def _is_supported_material(name: str, file_type: str, metadata: Dict[str, Any]) -> bool:
+    """Preserve legacy YouTube items and filter unsupported legacy file uploads."""
+    if file_type == "YouTube Lecture" or metadata.get("youtube_id"):
+        return True
+    from extractors.dispatcher import is_supported_file
+    return is_supported_file(name)
+
+
+def _supported_content_select():
+    """Build a safe SQL expression that never reads legacy unsupported binary text."""
+    from extractors.dispatcher import SUPPORTED_FILE_SUFFIXES
+    supported_conditions = ["file_type = 'YouTube Lecture'"]
+    suffix_patterns = []
+    for suffix in sorted(SUPPORTED_FILE_SUFFIXES):
+        supported_conditions.append("lower(name) LIKE ?")
+        suffix_patterns.append(f"%{suffix}")
+    expression = f"CASE WHEN {' OR '.join(supported_conditions)} THEN content ELSE NULL END"
+    return expression, tuple(suffix_patterns)
 
 def delete_material(doc_id: str):
     init_db()
@@ -306,6 +434,7 @@ def delete_material(doc_id: str):
         cursor.execute("DELETE FROM quiz_attempts WHERE doc_id = ?", (doc_id,))
         cursor.execute("DELETE FROM generated_quizzes WHERE doc_id = ?", (doc_id,))
         cursor.execute("DELETE FROM knowledge_maps WHERE doc_id = ?", (doc_id,))
+        cursor.execute("DELETE FROM learner_memory_events WHERE source_doc_id = ?", (doc_id,))
         conn.commit()
 
 # --- Smart Notes Operations ---
@@ -320,6 +449,7 @@ def save_note(doc_id: str, doc_name: str, style_key: str, style_title: str, cont
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (doc_id, doc_name, style_key, style_title, content, now_str, now_str))
         note_id = cursor.lastrowid
+        _record_learning_event(cursor, doc_id, "smart_notes_created", details={"style": style_key})
         conn.commit()
         return note_id
 
@@ -328,7 +458,10 @@ def update_note(note_id: int, content: str):
     now_str = datetime.now().strftime("%b %d, %H:%M")
     with get_connection() as conn:
         cursor = conn.cursor()
+        note = cursor.execute("SELECT doc_id, style_key FROM notes WHERE id = ?", (note_id,)).fetchone()
         cursor.execute("UPDATE notes SET content = ?, updated_at = ? WHERE id = ?", (content, now_str, note_id))
+        if note:
+            _record_learning_event(cursor, note["doc_id"], "smart_notes_edited", details={"note_id": note_id, "style": note["style_key"]})
         conn.commit()
 
 def get_notes_for_material(doc_id: str) -> List[Dict[str, Any]]:
@@ -356,6 +489,7 @@ def save_generated_quiz(doc_id: str, questions: List[Dict[str, Any]]):
             "INSERT OR REPLACE INTO generated_quizzes (doc_id, questions, created_at) VALUES (?, ?, ?)",
             (doc_id, json.dumps(questions), now_str)
         )
+        _record_learning_event(conn.cursor(), doc_id, "quiz_generated", details={"question_count": len(questions)})
         conn.commit()
 
 def get_generated_quiz(doc_id: str) -> Optional[Dict[str, Any]]:
@@ -378,6 +512,7 @@ def save_knowledge_map(doc_id: str, graph_data: Dict[str, Any]):
             "INSERT OR REPLACE INTO knowledge_maps (doc_id, graph_data, created_at) VALUES (?, ?, ?)",
             (doc_id, json.dumps(graph_data), now_str)
         )
+        _record_learning_event(conn.cursor(), doc_id, "knowledge_map_created", details={"node_count": len(graph_data.get("nodes", []))})
         conn.commit()
 
 def get_knowledge_map(doc_id: str) -> Optional[Dict[str, Any]]:
@@ -401,6 +536,7 @@ def save_infographic(doc_id: str, infographic_type: str, data: Dict[str, Any]):
             "INSERT OR REPLACE INTO infographics (doc_id, infographic_type, data, created_at) VALUES (?, ?, ?, ?)",
             (doc_id, infographic_type, json.dumps(data), now_str)
         )
+        _record_learning_event(conn.cursor(), doc_id, "infographic_created", details={"infographic_type": infographic_type})
         conn.commit()
 
 
@@ -430,6 +566,7 @@ def save_revision_plan(doc_id: str, plan_data: Dict[str, Any]):
             "INSERT OR REPLACE INTO revision_plans (doc_id, plan_data, updated_at) VALUES (?, ?, ?)",
             (doc_id, json.dumps(plan_data), now_str)
         )
+        _record_learning_event(conn.cursor(), doc_id, "revision_plan_created", details={"day_count": len(plan_data.get("days", []))})
         conn.commit()
 
 
@@ -477,6 +614,7 @@ def update_revision_task_status(doc_id: str, task_id: str, completed: bool) -> O
                 "UPDATE revision_plans SET plan_data = ?, updated_at = ? WHERE doc_id = ?",
                 (json.dumps(plan), now_str, doc_id)
             )
+            _record_learning_event(conn.cursor(), doc_id, "revision_task_status_changed", details={"task_id": task_id, "completed": bool(completed)})
             conn.commit()
         return plan
 
@@ -501,6 +639,9 @@ def save_flashcards(doc_id: str, cards: List[Dict[str, Any]]):
                 now_str,
                 now_str
             ))
+        if cards:
+            topics = sorted({str(card.get("topic") or "General") for card in cards})
+            _record_learning_event(cursor, doc_id, "flashcards_created", details={"card_count": len(cards), "topics": topics[:30]})
         conn.commit()
 
 def get_flashcards(doc_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -537,6 +678,10 @@ def update_flashcard_review(card_id: int, rating: str):
             SET review_count = review_count + 1, rating = ?, next_review = ?
             WHERE id = ?
         """, (rating, next_str, card_id))
+        if cursor.rowcount:
+            card = conn.execute("SELECT doc_id, topic FROM flashcards WHERE id = ?", (card_id,)).fetchone()
+            if card:
+                _record_learning_event(cursor, card["doc_id"], "flashcard_rated", topic=card["topic"], details={"rating": rating})
         conn.commit()
 
 def delete_flashcard(card_id: int):
@@ -584,6 +729,7 @@ def clear_chat_history(doc_id: str):
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM chat_messages WHERE doc_id = ?", (doc_id,))
+        _delete_tutor_events_for_chat(cursor, doc_id)
         conn.commit()
 
 # --- Quiz Attempts & Mastery Analytics ---
@@ -607,6 +753,15 @@ def save_quiz_attempt(doc_id: str, doc_name: str, score: int, total_questions: i
             json.dumps(details),
             now_str
         ))
+        incorrect_topics = sorted({
+            str(item.get("topic") or "General")
+            for item in details
+            if not item.get("is_correct") and item.get("student_answer") not in (None, "", "No answer submitted")
+        })
+        _record_learning_event(cursor, doc_id, "quiz_submitted", details={
+            "score": score, "total_questions": total_questions,
+            "topic_breakdown": topic_breakdown, "incorrect_topics": incorrect_topics[:30],
+        })
         conn.commit()
 
 def get_quiz_attempts(doc_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -794,6 +949,7 @@ def delete_chat_session(chat_id: str):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM chat_sessions WHERE id = ?", (chat_id,))
         cursor.execute("DELETE FROM chat_messages WHERE doc_id = ?", (chat_id,))
+        _delete_tutor_events_for_chat(cursor, chat_id)
         conn.commit()
 
 def get_recent_chats() -> List[Dict[str, Any]]:

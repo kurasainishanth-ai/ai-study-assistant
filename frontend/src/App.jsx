@@ -610,6 +610,22 @@ function QuizRenderer({ data, runSubmit, submitting, onResetMode, onCitationClic
 function MapRenderer({ data }) {
   const containerRef = useRef(null);
   const [dims, setDims] = useState({ w: 700, h: 500 });
+  const [mapColors, setMapColors] = useState({ foreground: "#f1f0ec", background: "#252830" });
+
+  useEffect(() => {
+    const syncThemeColors = () => {
+      const styles = getComputedStyle(document.documentElement);
+      const foreground = styles.getPropertyValue("--fg").trim() || "#f1f0ec";
+      const background = styles.getPropertyValue("--surface").trim() || "#252830";
+      setMapColors((current) => current.foreground === foreground && current.background === background
+        ? current
+        : { foreground, background });
+    };
+    syncThemeColors();
+    const observer = new MutationObserver(syncThemeColors);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -653,7 +669,11 @@ function MapRenderer({ data }) {
           const r = Math.sqrt(node.val || 1) * 5;
           ctx.fillStyle = catColors[node.category] || "#a78bfa";
           ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, 2 * Math.PI); ctx.fill();
-          ctx.fillStyle = "#1a1a2e";
+          ctx.lineWidth = Math.max(2 / globalScale, 1);
+          ctx.strokeStyle = mapColors.background;
+          ctx.lineJoin = "round";
+          ctx.strokeText(label, node.x, node.y + r + 2);
+          ctx.fillStyle = mapColors.foreground;
           ctx.textAlign = "center"; ctx.textBaseline = "top";
           ctx.fillText(label, node.x, node.y + r + 2);
         }}
@@ -2755,6 +2775,7 @@ function Tutor({
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [tutorMode, setTutorMode] = useState("teaching");
   const [clearing, setClearing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
   const [targetCitation, setTargetCitation] = useState(null);
@@ -2838,7 +2859,7 @@ function Tutor({
     setBusy(true);
     try {
       const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
-      const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId);
+      const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId, tutorMode);
       const answerText = r.response || r.answer || r.content || text(r);
       const citList = (r.citations && r.citations.length) ? r.citations : Array.from(new Set(answerText.match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || []));
       setMessages((x) => [...x, ["Study tutor", answerText, "", citList]]);
@@ -2855,7 +2876,7 @@ function Tutor({
       <div className={showPreview ? "preview-split-main" : ""}>
         {/* Active-document indicator & In-Chat Source Picker */}
         <div className="source" style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap'}}>
-          <div style={{display:'flex', alignItems:'center', gap:'12px', flex:1, minWidth: '240px'}}>
+          <div style={{display:'flex', alignItems:'center', gap:'12px', flex:'1 1 320px', minWidth: 0, flexWrap:'wrap'}}>
       <Brain size={18} style={{color: 'var(--icon)', flexShrink: 0}} />
             <small style={{fontWeight: 600, letterSpacing: '0.05em', color: 'var(--fg-3)'}}>GROUNDING ANSWERS IN</small>
             
@@ -2922,8 +2943,29 @@ function Tutor({
           {busy && <div className="msg"><small>Study tutor</small><p className="typing"><LoaderCircle className="spin" size={14} /> Thinking…</p></div>}
         </div>
 
+        <div className="tutor-mode-picker" role="group" aria-label="Tutor mode">
+          <span>Mode</span>
+          <button
+            type="button"
+            className={`tutor-mode-option ${tutorMode === "teaching" ? "active" : ""}`}
+            aria-pressed={tutorMode === "teaching"}
+            onClick={() => setTutorMode("teaching")}
+          >
+            Teaching
+          </button>
+          <button
+            type="button"
+            className={`tutor-mode-option ${tutorMode === "learning" ? "active" : ""}`}
+            aria-pressed={tutorMode === "learning"}
+            onClick={() => setTutorMode("learning")}
+          >
+            Learning
+          </button>
+          <small>{tutorMode === "learning" ? "Hints and questions help you reach the answer." : "Get a direct explanation and examples."}</small>
+        </div>
+
         <form className="chat-input" onSubmit={submit}>
-          <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask your AI Tutor anything..." />
+          <input disabled={busy} value={input} onChange={(e) => setInput(e.target.value)} placeholder={tutorMode === "learning" ? "Share a question or your attempt..." : "Ask your AI Tutor anything..."} />
           <button className="btn-send" disabled={busy || !input.trim()} type="submit"><Send size={18} /></button>
         </form>
       </div>

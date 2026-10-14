@@ -647,6 +647,9 @@ header h1 {
   border-radius: 10px;
   font-size: 12px;
   margin-bottom: 24px;
+  /* Keep source menus above later blurred panels such as the Tutor chat. */
+  position: relative;
+  z-index: 2;
 }
 .source small {
   font: 500 10px 'JetBrains Mono';
@@ -894,7 +897,7 @@ header h1 {
 .render-map {
   width: 100%;
   height: 500px;
-  background: #f5f8f4;
+  background: var(--surface);
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -907,8 +910,9 @@ header h1 {
   display: flex;
   gap: 14px;
   font-size: 11px;
-  color: var(--fg-2);
-  background: rgba(255,255,255,.85);
+  color: var(--fg);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   padding: 6px 12px;
   border-radius: 6px;
 }
@@ -1026,20 +1030,31 @@ header h1 {
 .md-body ul, .md-body ol { padding-left: 22px; }
 .md-body li { margin-bottom: 4px; }
 .md-body pre {
-  background: #f0efe9;
-  padding: 14px;
+  /* Fenced Markdown code must remain legible regardless of the active app theme. */
+  max-width: 100%;
+  box-sizing: border-box;
+  background: #161b22;
+  color: #e6edf3;
+  padding: 14px 16px;
   border-radius: 8px;
   overflow-x: auto;
   font: 13px/1.5 'JetBrains Mono', monospace;
-  border: 1px solid var(--border);
+  border: 1px solid #30363d;
 }
-.md-body code {
+.md-body :not(pre) > code {
   font: 13px 'JetBrains Mono', monospace;
-  background: #edeee8;
+  background: #2a303a;
+  color: #e6edf3;
   padding: 2px 5px;
   border-radius: 4px;
 }
-.md-body pre code { background: transparent; padding: 0; }
+.md-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font: inherit;
+}
 .md-body table {
   width: 100%;
   border-collapse: collapse;
@@ -1847,6 +1862,33 @@ html[data-theme="Ben 10 (Omnitrix Cyber Alien)"] .hero::after {
   -webkit-backdrop-filter: blur(14px) saturate(150%);
   transition: border-color .2s ease, box-shadow .2s ease;
 }
+.tutor-mode-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  color: var(--fg-2);
+  font-size: 12px;
+}
+.tutor-mode-picker > span { font-weight: 700; margin-right: 2px; }
+.tutor-mode-option {
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--fg);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.tutor-mode-option:hover { border-color: var(--accent); }
+.tutor-mode-option.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.tutor-mode-picker small { color: var(--fg-2); margin-left: 2px; }
 .tutor-page .chat-input:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent), 0 8px 28px rgba(0, 0, 0, .24);
@@ -2031,6 +2073,7 @@ main::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 72%
 
 .tutor-page .chat-container {
   position: relative;
+  z-index: 0;
   padding: 22px;
   border: 1px solid var(--glass-border);
   border-radius: 18px;
@@ -2056,6 +2099,14 @@ main::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 72%
 }
 .tutor-page .msg.you .md-body,
 .tutor-page .msg.you .md-body code { color: var(--accent-fg); }
+.tutor-page .msg.you .md-body :not(pre) > code {
+  background: #2a303a;
+  color: #e6edf3;
+}
+.tutor-page .msg.you .md-body pre code {
+  background: transparent;
+  color: #e6edf3;
+}
 .tutor-page .chat-input { margin-top: 16px; }
 .tutor-page .preview-split-panel {
   border-color: var(--glass-border);
