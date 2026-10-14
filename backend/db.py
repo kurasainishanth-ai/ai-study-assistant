@@ -758,9 +758,21 @@ def save_quiz_attempt(doc_id: str, doc_name: str, score: int, total_questions: i
             for item in details
             if not item.get("is_correct") and item.get("student_answer") not in (None, "", "No answer submitted")
         })
+        incorrect_answers = [
+            {
+                "topic": str(item.get("topic") or "General")[:100],
+                "question": str(item.get("question") or "")[:300],
+                "student_answer": str(item.get("student_answer") or "")[:240],
+                "correct_answer": str(item.get("correct_answer") or "")[:240],
+                "misconception": str(item.get("misconception_analysis") or "")[:240],
+            }
+            for item in details
+            if not item.get("is_correct") and item.get("student_answer") not in (None, "", "No answer submitted")
+        ][:10]
         _record_learning_event(cursor, doc_id, "quiz_submitted", details={
             "score": score, "total_questions": total_questions,
             "topic_breakdown": topic_breakdown, "incorrect_topics": incorrect_topics[:30],
+            "incorrect_answers": incorrect_answers,
         })
         conn.commit()
 
@@ -816,30 +828,14 @@ def get_learning_progress() -> Dict[str, Any]:
         avg_score = round(q_row[1], 1) if q_row[1] is not None else 0.0
         
         # 5. Topic mastery estimation based on quiz breakdown
-        cursor.execute("SELECT topic_breakdown FROM quiz_attempts")
+        cursor.execute("SELECT topic_breakdown FROM quiz_attempts ORDER BY id DESC")
         topic_rows = cursor.fetchall()
-        topic_scores: Dict[str, List[float]] = {}
-        for r in topic_rows:
-            if r[0]:
-                tb = json.loads(r[0])
-                for topic, stat in tb.items():
-                    if isinstance(stat, dict):
-                        pct = (stat.get("correct", 0) / max(stat.get("total", 1), 1)) * 100
-                    else:
-                        pct = float(stat)
-                    topic_scores.setdefault(topic, []).append(pct)
-                    
-        topic_mastery = {}
+        from services.learner_model import estimate_topic_mastery
+        topic_mastery = estimate_topic_mastery(topic_rows)
         revision_topics = []
-        for t, scores in topic_scores.items():
-            avg_t = round(sum(scores) / len(scores), 1)
-            topic_mastery[t] = {
-                "average_score": avg_t,
-                "attempts": len(scores),
-                "status": "Mastered" if avg_t >= 85 and len(scores) >= 2 else ("Review Recommended" if avg_t < 70 else "In Progress")
-            }
-            if avg_t < 70:
-                revision_topics.append(t)
+        for topic, estimate in topic_mastery.items():
+            if estimate["average_score"] < 60:
+                revision_topics.append(topic)
                 
         # Recommended next activity
         if fc_difficult > 0:

@@ -229,6 +229,7 @@ const parseTimestampSeconds = (tsStr) => {
 
 const parseCitationInfo = (citStr) => {
   if (!citStr) return null;
+  if (typeof citStr === "object" && citStr.type) return citStr;
   const s = String(citStr).trim();
   const tsMatch = s.match(/(?:\[)?(\d{1,2}:\d{2}(?::\d{2})?)(?:\])?/);
   if (tsMatch) {
@@ -271,6 +272,18 @@ const parseCitationInfo = (citStr) => {
     raw: s,
     target: s.replace(/^\[|\]$/g, "").trim(),
     label: s.replace(/^\[|\]$/g, "").trim()
+  };
+};
+
+const resolveTutorCitation = (citation) => {
+  if (!citation || typeof citation !== "object") return citation;
+  const parsed = parseCitationInfo(citation.reference);
+  if (!parsed) return citation;
+  return {
+    ...parsed,
+    source_id: citation.source_id,
+    source_name: citation.source_name,
+    label: `${citation.source_name || "Source"} — ${parsed.label || citation.reference}`,
   };
 };
 
@@ -1612,12 +1625,12 @@ function SourceSelectDropdown({ materials, selectedSourceIds, onToggleSource, on
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const allSelected = materials && materials.length > 0 && selectedSourceIds.length === materials.length;
+  const allSelected = materials && materials.length > 0 && materials.every((material) => selectedSourceIds.includes(material.id));
   const isNoneSelected = selectedSourceIds.length === 0;
 
-  let label = "All Workspace Materials";
+  let label = "Select materials";
   if (isNoneSelected) {
-    label = "All Workspace Materials";
+    label = "No materials selected";
   } else if (allSelected) {
     label = `All Materials (${materials.length})`;
   } else if (selectedSourceIds.length === 1) {
@@ -1811,6 +1824,7 @@ export default function App() {
   const [chats, setChats] = useState([]);
   const [selected, setSelected] = useState(null);
   const [selectedSourceIds, setSelectedSourceIds] = useState([]);
+  const sourceSelectionInitialized = useRef(false);
   const [busy, setBusy] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [notice, setNotice] = useState("");
@@ -1852,12 +1866,12 @@ export default function App() {
       if (pData !== undefined) setProgressData(pData);
       setProgressLoading(false);
 
-      setSelectedSourceIds((prev) => {
-        if (!data || data.length === 0) return [];
-        const readyMaterials = data.filter(canUseAsStudySource);
-        if (prev.length === 0) return readyMaterials.map((material) => material.id);
-        return prev.filter((id) => readyMaterials.some((material) => material.id === id));
-      });
+      const readySourceIds = (data || []).filter(canUseAsStudySource).map((material) => material.id);
+      const initializeSelection = !sourceSelectionInitialized.current;
+      sourceSelectionInitialized.current = true;
+      setSelectedSourceIds((prev) => initializeSelection
+        ? readySourceIds
+        : prev.filter((id) => readySourceIds.includes(id)));
     } catch (e) { setNotice(e.message); }
   }, []);
 
@@ -1878,11 +1892,12 @@ export default function App() {
           }
           return data.find(canUseAsStudySource) ?? null;
         });
-        setSelectedSourceIds((prev) => {
-          const readyMaterials = data.filter(canUseAsStudySource);
-          if (prev.length === 0) return readyMaterials.map((material) => material.id);
-          return prev.filter((id) => readyMaterials.some((material) => material.id === id));
-        });
+        const readySourceIds = data.filter(canUseAsStudySource).map((material) => material.id);
+        const initializeSelection = !sourceSelectionInitialized.current;
+        sourceSelectionInitialized.current = true;
+        setSelectedSourceIds((prev) => initializeSelection
+          ? readySourceIds
+          : prev.filter((id) => readySourceIds.includes(id)));
       } catch (_) {}
     }, 1500);
     return () => window.clearInterval(timer);
@@ -2495,15 +2510,18 @@ function Studio({
 }) {
   const [mode, setMode] = useState(null); // Null = Landing Overview
   const [busy, setBusy] = useState(false);
+  const [quizDifficulty, setQuizDifficulty] = useState("medium");
+  const [quizQuestionCount, setQuizQuestionCount] = useState(5);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
   const [showPreview, setShowPreview] = useState(true);
   const [targetCitation, setTargetCitation] = useState(null);
 
-  const requestedDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
-  const activeMaterialCandidate = (materials || []).find((m) => m.id === requestedDocId) || (!selected?.is_chat ? selected : null);
-  const activeMaterial = canUseAsStudySource(activeMaterialCandidate) ? activeMaterialCandidate : null;
-  const activeDocId = activeMaterial?.id || null;
+  const activeSourceMaterials = (materials || []).filter((material) =>
+    selectedSourceIds.includes(material.id) && canUseAsStudySource(material)
+  );
+  const activeMaterial = activeSourceMaterials[0] || null;
+  const activeDocId = activeSourceMaterials.map((material) => material.id).join(",") || null;
 
   const tool = mode ? TOOLS.find((t) => t.id === mode) : null;
   const ToolIcon = tool?.icon;
@@ -2545,7 +2563,9 @@ function Studio({
     if (!activeDocId) { warn("Choose a study material first."); return; }
     setBusy(true); setError("");
     try {
-      const res = await tool.generate(activeDocId);
+      const res = mode === "quiz"
+        ? await api.generateQuiz(activeDocId, quizQuestionCount, quizDifficulty)
+        : await tool.generate(activeDocId);
       setCache((c) => ({ ...c, [ck]: res }));
     } catch (e) {
       setError(e.message);
@@ -2690,6 +2710,34 @@ function Studio({
                 <small className="label" style={{margin: '0 0 10px'}}>STUDY STUDIO</small>
                 <h2 style={{margin: 0, display:'flex', alignItems:'center', gap: 10}}><ToolIcon size={28} />{tool.label}</h2>
                 <p>{tool.desc}</p>
+                {mode === "quiz" && (
+                  <div className="quiz-config" aria-label="Quiz settings">
+                    <div className="quiz-config-group" role="group" aria-label="Difficulty">
+                      <span className="quiz-config-label">Difficulty</span>
+                      {["easy", "medium", "hard"].map((difficulty) => (
+                        <button
+                          key={difficulty}
+                          type="button"
+                          className={`quiz-choice${quizDifficulty === difficulty ? " active" : ""}`}
+                          aria-pressed={quizDifficulty === difficulty}
+                          onClick={() => setQuizDifficulty(difficulty)}
+                        >{difficulty[0].toUpperCase() + difficulty.slice(1)}</button>
+                      ))}
+                    </div>
+                    <div className="quiz-config-group" role="group" aria-label="Number of questions">
+                      <span className="quiz-config-label">Questions</span>
+                      {[5, 10, 15].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          className={`quiz-choice${quizQuestionCount === count ? " active" : ""}`}
+                          aria-pressed={quizQuestionCount === count}
+                          onClick={() => setQuizQuestionCount(count)}
+                        >{count}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="work-actions">
                 {!hasResult && mode !== "scheduler" && (
@@ -2781,10 +2829,11 @@ function Tutor({
   const [targetCitation, setTargetCitation] = useState(null);
   const scrollRef = useRef(null);
 
-  const requestedDocId = (selectedSourceIds && selectedSourceIds[0]) || selected?.source_doc_id || (!selected?.is_chat ? selected?.id : null);
-  const activeMaterialCandidate = (materials || []).find((m) => m.id === requestedDocId) || (!selected?.is_chat ? selected : null);
-  const activeMaterial = canUseAsStudySource(activeMaterialCandidate) ? activeMaterialCandidate : null;
-  const activeDocId = activeMaterial?.id || null;
+  const activeSourceMaterials = (materials || []).filter((material) =>
+    selectedSourceIds.includes(material.id) && canUseAsStudySource(material)
+  );
+  const activeMaterial = activeSourceMaterials[0] || null;
+  const activeDocId = activeSourceMaterials.map((material) => material.id).join(",") || null;
 
   useEffect(() => {
     let live = true;
@@ -2795,7 +2844,7 @@ function Tutor({
             h.role === "user" ? "You" : "Study tutor",
             h.content,
             h.role === "user" ? "you" : "",
-            h.citations ? (typeof h.citations === "string" ? JSON.parse(h.citations) : h.citations) : []
+            h.citations ? (typeof h.citations === "string" ? JSON.parse(h.citations) : h.citations).map(resolveTutorCitation) : []
           ]));
         }
       }).catch(() => null);
@@ -2813,7 +2862,7 @@ function Tutor({
     const cit = typeof citationObj === "string" ? parseCitationInfo(citationObj) : citationObj;
     if (!cit) return;
     if (cit.type === "timestamp") {
-      let targetMat = activeMaterial;
+      let targetMat = (cit.source_id && materials.find((material) => material.id === cit.source_id)) || activeMaterial;
       if (!targetMat || (!targetMat.metadata?.youtube_id && !targetMat.source_url)) {
         targetMat = materials.find((m) => m.type === "YouTube Lecture" || m.metadata?.youtube_id || m.source_url);
       }
@@ -2858,11 +2907,17 @@ function Tutor({
     setMessages((x) => [...x, ["You", q, "you"]]);
     setBusy(true);
     try {
-      const sourceDocId = selectedSourceIds.length ? selectedSourceIds.join(",") : (currentSelected?.source_doc_id || (!currentSelected?.is_chat ? currentSelected?.id : null));
+      const sourceDocId = selectedSourceIds.join(",");
+      if (!sourceDocId) {
+        setMessages((x) => [...x, ["System", "Select at least one study material before asking the tutor.", "error"]]);
+        setBusy(false);
+        return;
+      }
       const r = await api.tutor(currentSelected.id, q, "intermediate", sourceDocId, tutorMode);
       const answerText = r.response || r.answer || r.content || text(r);
       const citList = (r.citations && r.citations.length) ? r.citations : Array.from(new Set(answerText.match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || []));
-      setMessages((x) => [...x, ["Study tutor", answerText, "", citList]]);
+      const sourceCitations = (r.citation_sources || []).map(resolveTutorCitation);
+      setMessages((x) => [...x, ["Study tutor", answerText, "", citList, sourceCitations]]);
       if (refreshChats) refreshChats();
     } catch (err) {
       setMessages((x) => [...x, ["System", "Error: " + err.message, "error"]]);
@@ -2912,7 +2967,7 @@ function Tutor({
         {/* Chat area */}
         <div className="chat-container" ref={scrollRef}>
           {messages.length ? messages.map((m, i) => {
-            const citList = Array.isArray(m[3]) && m[3].length ? m[3] : (m[2] !== "you" ? Array.from(new Set(String(m[1]).match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || [])) : []);
+            const citList = Array.isArray(m[4]) && m[4].length ? m[4] : (Array.isArray(m[3]) && m[3].length ? m[3].map(resolveTutorCitation) : (m[2] !== "you" ? Array.from(new Set(String(m[1]).match(/\[(?:(?:Page|Slide|Section|Part)\s*[^\]]+|\d{1,2}:\d{2}(?::\d{2})?)\]/gi) || [])) : []));
             return (
               <div key={i} className={`msg ${m[2]}`}>
                 <small>{m[0]}</small>
@@ -2972,7 +3027,7 @@ function Tutor({
 
       {showPreview && activeMaterial && (
         <DocumentPreviewPanel
-          material={activeMaterial}
+          material={(targetCitation?.source_id && materials.find((material) => material.id === targetCitation.source_id)) || activeMaterial}
           targetCitation={targetCitation}
           onClose={() => setShowPreview(false)}
           onOpenVideo={onOpenVideo}
@@ -3307,7 +3362,7 @@ function DocumentPreviewPanel({
                   onClick={() => reuploadRef.current?.click()}
                 >
                   {reuploadLoading ? (
-                    <><Loader2 size={14} className="spin" /> Uploading…</>
+                    <><LoaderCircle size={14} className="spin" /> Uploading…</>
                   ) : (
                     <><Upload size={14} /> Re-upload PDF</>
                   )}

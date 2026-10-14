@@ -10,7 +10,8 @@ def ocr_image(image: Image.Image) -> str:
     prompt = (
         "Extract all the text, handwriting, and mathematical notation from this image exactly as it appears. "
         "Preserve the original layout, paragraph breaks, numbered lists, and headings as much as possible. "
-        "If the image contains a diagram, label its parts. "
+        "If the image contains a diagram, chart, or figure, also describe its purpose, visible labels, arrows or relationships, "
+        "process order, and chart axes/trends in concise factual language. Distinguish visible evidence from interpretation. "
         "Do not invent text that is not there. If an equation or handwriting is completely unreadable, mark it as [Unreadable]."
     )
     try:

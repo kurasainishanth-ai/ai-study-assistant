@@ -2,7 +2,7 @@ import sys
 import os
 import asyncio
 import time
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 # Ensure backend directory is in sys.path
@@ -42,6 +42,7 @@ from services.quiz_service import generate_quiz, evaluate_quiz
 from services.knowledge_map_service import generate_knowledge_map
 from services.visual_service import explain_visual_diagram, generate_concept_illustration
 from services.infographic_service import generate_infographic, INFOGRAPHIC_TYPES
+from services.material_context import selected_context, split_source_ids
 from services.scheduler_service import get_material_topics, generate_revision_plan
 
 # Initialize SQLite database on startup
@@ -99,8 +100,8 @@ class TutorChatRequest(BaseModel):
 
 class QuizGenerateRequest(BaseModel):
     doc_id: str
-    num_questions: int = 5
-    difficulty: str = "medium"
+    num_questions: Literal[5, 10, 15] = 5
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
 
 class QuizSubmitRequest(BaseModel):
     doc_id: str
@@ -485,9 +486,11 @@ def generate_notes_endpoint(req: NoteGenerateRequest):
             detail="A Smart Notes generation request for this document and style is already currently in progress. Please wait."
         )
 
-    material = db.get_material(req.doc_id)
-    if not material:
-        raise HTTPException(status_code=404, detail="Material not found")
+    try:
+        _require_ready_sources(req.doc_id)
+        material = selected_context(req.doc_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     _require_academic_sources(req.doc_id)
     if material["status"] != "Ready" or not material.get("content"):
         raise HTTPException(status_code=400, detail="Document content is not available or failed extraction")
@@ -499,7 +502,7 @@ def generate_notes_endpoint(req: NoteGenerateRequest):
     extracted_dict = {
         "type": "text",
         "content": material["content"],
-        "file_name": material["name"]
+        "file_name": material["name"],
     }
 
     in_flight_notes.add(request_key)
@@ -552,8 +555,11 @@ def generate_notes_endpoint(req: NoteGenerateRequest):
 
 @app.get("/api/notes/{doc_id}")
 def get_notes_endpoint(doc_id: str):
-    """Retrieves all saved notes for a material."""
-    return db.get_notes_for_material(doc_id)
+    """Retrieves notes saved for this selection and its individual materials."""
+    notes = []
+    for source_id in list(dict.fromkeys([doc_id, *split_source_ids(doc_id)])):
+        notes.extend(db.get_notes_for_material(source_id))
+    return sorted({note["id"]: note for note in notes}.values(), key=lambda note: note["id"], reverse=True)
 
 @app.put("/api/notes/{note_id}")
 def update_note_endpoint(note_id: int, req: NoteUpdateRequest):
@@ -576,6 +582,7 @@ def delete_note_endpoint(note_id: int):
 def generate_flashcards_endpoint(req: FlashcardGenerateRequest):
     """Generates source-grounded flashcards with SRS metadata."""
     try:
+        _require_ready_sources(req.doc_id)
         _require_academic_sources(req.doc_id)
         cards = generate_flashcards(req.doc_id, count=req.count, difficulty=req.difficulty)
         if not cards:
@@ -616,6 +623,7 @@ def tutor_chat_endpoint(req: TutorChatRequest):
         elif not source_ids:
             session = db.get_chat_session(req.doc_id)
             source_ids = session.get("source_doc_id") if session else None
+        _require_ready_sources(source_ids)
         _require_academic_sources(source_ids)
         # ask_ai_tutor is the source-grounded path that records both messages
         # and returns usable citations.  The former agent call discarded this
@@ -632,6 +640,7 @@ def tutor_chat_endpoint(req: TutorChatRequest):
             'content': result.get('answer', ''),
             'response': result.get('answer', ''),
             'citations': result.get('citations', []),
+            'citation_sources': result.get('citation_sources', []),
             'level': req.level,
             'source_doc_id': result.get('source_doc_id'),
             'source_name': result.get('source_name'),
@@ -673,6 +682,7 @@ def clear_tutor_history_endpoint(doc_id: str):
 def generate_quiz_endpoint(req: QuizGenerateRequest):
     """Generates diagnostic quiz questions grounded in study material."""
     try:
+        _require_ready_sources(req.doc_id)
         _require_academic_sources(req.doc_id)
         questions = generate_quiz(req.doc_id, num_questions=req.num_questions, difficulty=req.difficulty)
         if not questions:
@@ -714,6 +724,7 @@ def get_knowledge_map_endpoint(doc_id: str):
 def generate_knowledge_map_endpoint(doc_id: str):
     """Explicitly generates and saves a new source-grounded map."""
     try:
+        _require_ready_sources(doc_id)
         _require_academic_sources(doc_id)
         graph = generate_knowledge_map(doc_id)
         if not graph.get("nodes"):

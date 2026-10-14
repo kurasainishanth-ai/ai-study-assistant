@@ -27,7 +27,8 @@ class TestQuizDeduplication(unittest.TestCase):
         db.init_db()
         db.save_material({
             "id": "doc_dedup",
-            "name": "Testing Context",
+            # Material loading filters unsupported names; use a supported suffix.
+            "name": "Testing Context.txt",
             "type": "Text",
             "size_kb": 10,
             "upload_time": "Now",
@@ -38,6 +39,31 @@ class TestQuizDeduplication(unittest.TestCase):
 
     def tearDown(self):
         db.get_connection = self.original_get_connection
+
+    def test_quiz_mistakes_are_saved_in_shared_learner_memory(self):
+        db.save_quiz_attempt(
+            doc_id="doc_dedup",
+            doc_name="Testing Context",
+            score=0,
+            total_questions=1,
+            topic_breakdown={"recursion": {"correct": 0, "total": 1}},
+            details=[{
+                "topic": "recursion",
+                "question": "What is the base case?",
+                "student_answer": "The recursive call",
+                "correct_answer": "The stopping condition",
+                "is_correct": False,
+                "misconception_analysis": "The recursive call is being confused with the stopping condition.",
+            }],
+        )
+
+        events = db.get_learning_events(["doc_dedup"], limit=10)
+        quiz_event = next(event for event in events if event["activity_type"] == "quiz_submitted")
+        mistake = quiz_event["details"]["incorrect_answers"][0]
+        self.assertEqual(mistake["topic"], "recursion")
+        self.assertEqual(mistake["student_answer"], "The recursive call")
+        self.assertEqual(mistake["correct_answer"], "The stopping condition")
+        self.assertIn("stopping condition", mistake["misconception"])
 
     @patch('services.gemini_caller.call_gemini_with_retry')
     def test_empty_history(self, mock_gemini):
@@ -57,6 +83,28 @@ class TestQuizDeduplication(unittest.TestCase):
         # Verify prompt did not include DEDUPLICATION block
         prompt_used = mock_gemini.call_args.kwargs.get('contents')[0]
         self.assertNotIn("CRITICAL RULE - DEDUPLICATION", prompt_used)
+
+    @patch('services.gemini_caller.call_gemini_with_retry')
+    def test_requested_hard_difficulty_and_count_reach_generation_prompt(self, mock_gemini):
+        mock_gemini.return_value = json.dumps([
+            {"type": "short_answer", "question": question, "options": [], "correct_answer": f"Answer {i}"}
+            for i, question in enumerate([
+                "Define the alpha operator?", "Why is beta transformation invertible?",
+                "When does gamma convergence hold?", "Contrast delta and epsilon stability?",
+                "How can zeta recursion terminate?",
+            ], start=1)
+        ])
+
+        result = generate_quiz("doc_dedup", num_questions=5, difficulty="hard")
+
+        self.assertEqual(len(result), 5)
+        prompt = mock_gemini.call_args.kwargs["contents"][0]
+        self.assertIn("Generate 5 questions with difficulty 'hard'", prompt)
+        self.assertIn("multi-step reasoning", prompt)
+
+    def test_invalid_difficulty_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "difficulty must be"):
+            generate_quiz("doc_dedup", difficulty="expert")
 
     @patch('services.gemini_caller.call_gemini_with_retry')
     def test_exact_and_semantic_duplicates(self, mock_gemini):
@@ -102,6 +150,20 @@ class TestQuizDeduplication(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["question"], "What is 2+2?")
         self.assertEqual(result[1]["question"], "Calculate the product of 7 and 8.")
+
+    @patch('services.gemini_caller.call_gemini_with_retry', return_value=json.dumps([
+        {"type": "numerical", "question": "Compute 2 + 2", "correct_answer": "4", "tolerance": 0.01, "topic": "Arithmetic"}
+    ]))
+    def test_numerical_questions_are_preserved_with_tolerance(self, _mock_gemini):
+        result = generate_quiz("doc_dedup", num_questions=1)
+        self.assertEqual(result[0]["type"], "numerical")
+        self.assertEqual(result[0]["tolerance"], 0.01)
+
+    @patch('services.gemini_caller.call_gemini_with_retry', return_value=json.dumps([
+        {"type": "mcq", "question": "Capital?", "options": ["A) Berlin", "B) Rome"], "correct_answer": "Paris"}
+    ]))
+    def test_invalid_mcq_answer_key_is_filtered(self, _mock_gemini):
+        self.assertEqual(generate_quiz("doc_dedup", num_questions=1), [])
 
 if __name__ == '__main__':
     unittest.main()

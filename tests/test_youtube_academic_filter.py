@@ -149,10 +149,11 @@ class TestYouTubeContentAnalysis(unittest.TestCase):
         self.assertIn("academic_context_evidence", result)
 
     @patch("extractors.youtube_extractor.analyze_youtube_video")
+    @patch("extractors.youtube_extractor.analyze_youtube_transcript")
     @patch("extractors.youtube_extractor._read_captions")
     @patch("extractors.youtube_extractor.get_youtube_metadata")
     def test_actual_content_overrides_academic_sounding_title(
-        self, mock_metadata, mock_read_captions, mock_analyze_video
+        self, mock_metadata, mock_read_captions, mock_analyze_transcript, mock_analyze_video
     ):
         mock_metadata.return_value = self._metadata("Introduction to Operating Systems")
         chosen, raw = self._caption_objects()
@@ -160,9 +161,36 @@ class TestYouTubeContentAnalysis(unittest.TestCase):
         mock_analyze_video.return_value = assessment(
             "non_academic", "The actual video is a movie trailer and does not teach the title's subject."
         )
+        mock_analyze_transcript.return_value = assessment(
+            "non_academic", "The caption dialogue is scripted entertainment, not instruction."
+        )
 
-        with self.assertRaisesRegex(ValueError, "actual video is a movie trailer"):
+        with self.assertRaisesRegex(ValueError, "Gemini determined"):
             extract_youtube_content("https://youtu.be/p2b2Vb-cYCs")
+
+    @patch("extractors.youtube_extractor.analyze_youtube_video")
+    @patch("extractors.youtube_extractor.analyze_youtube_transcript")
+    @patch("extractors.youtube_extractor._read_captions")
+    @patch("extractors.youtube_extractor.get_youtube_metadata")
+    def test_clear_academic_captions_can_recover_video_review_false_negative(
+        self, mock_metadata, mock_read_captions, mock_analyze_transcript, mock_analyze_video
+    ):
+        mock_metadata.return_value = self._metadata("Misleading title")
+        chosen, raw = self._caption_objects()
+        mock_read_captions.return_value = (chosen, raw)
+        mock_analyze_video.return_value = assessment(
+            "non_academic", "The sampled visuals did not appear instructional."
+        )
+        mock_analyze_transcript.return_value = assessment(
+            "academic", "The instructor explains database normalization with worked examples."
+        )
+
+        result = extract_youtube_content("https://youtu.be/p2b2Vb-cYCs")
+
+        self.assertTrue(result["academic_context_validated"])
+        self.assertIn("Caption review found academic instruction", result["academic_context_evidence"])
+        self.assertIn("Direct video review disagreed", result["academic_context_evidence"])
+        mock_analyze_transcript.assert_called_once()
 
     @patch("extractors.youtube_extractor.analyze_youtube_video")
     @patch("extractors.youtube_extractor._read_captions")

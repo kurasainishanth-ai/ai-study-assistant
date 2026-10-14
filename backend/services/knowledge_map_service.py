@@ -4,22 +4,23 @@ from typing import List, Dict, Any, Optional
 from google.genai import types
 from config import get_gemini_client, DEFAULT_MODEL
 import db
+from services.material_context import selected_context, split_source_ids
 
 def generate_knowledge_map(doc_id: str) -> Dict[str, Any]:
     """
     Extracts authentic topic nodes and prerequisite relationships strictly grounded in the document.
     Correlates with student quiz attempts to flag topics needing revision.
     """
-    material = db.get_material(doc_id)
-    if not material:
-        raise ValueError(f"Study material with ID '{doc_id}' not found.")
+    material = selected_context(doc_id)
         
     doc_content = material.get("content", "")
     if not doc_content.strip():
         return {"nodes": [], "edges": [], "empty_reason": "No readable text content found."}
 
     # Fetch real quiz attempt data to identify weak topics
-    attempts = db.get_quiz_attempts(doc_id)
+    attempts = []
+    for source_id in list(dict.fromkeys([doc_id, *split_source_ids(doc_id)])):
+        attempts.extend(db.get_quiz_attempts(source_id))
     weak_topics = set()
     for a in attempts:
         for topic, stat in a.get("topic_breakdown", {}).items():
@@ -31,6 +32,7 @@ def generate_knowledge_map(doc_id: str) -> Dict[str, Any]:
 
     system_instruction = (
         "You are an expert cognitive curriculum architect. Extract a structured knowledge map from the study material. "
+        "When several labeled sources are provided, represent concepts from across the selected sources, not only the first one. "
         "Strictly adhere to what is mentioned in the text; do NOT invent outside concepts or ungrounded dependencies. "
         "Return ONLY a JSON object with this exact schema:\n"
         "{\n"
@@ -46,7 +48,7 @@ def generate_knowledge_map(doc_id: str) -> Dict[str, Any]:
 
     prompt = (
         f"STUDY MATERIAL (Source: '{material['name']}'):\n"
-        f"{doc_content[:15000]}\n\n"
+        f"{doc_content}\n\n"
         "TASK: Extract 5 to 10 key topic nodes and logical conceptual edges connecting them."
     )
 

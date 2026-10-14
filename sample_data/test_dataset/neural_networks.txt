@@ -1,0 +1,16 @@
+Neural Networks — synthetic test notes
+
+[Page 1]
+An input layer receives the feature values for one example and passes those values to the next layer. A neuron can combine input features by multiplying each feature by a learned weight and adding a bias.
+
+[Page 2]
+Weights and biases are learned parameters. For inputs x1 and x2, weights w1 and w2, and bias b, the weighted sum is z = w1*x1 + w2*x2 + b. An activation function is then applied to z.
+
+[Page 3]
+The Rectified Linear Unit (ReLU) is defined as f(z) = max(0, z). For z = -3, ReLU returns 0. For z = 4, ReLU returns 4. The sigmoid function maps real-valued inputs into the interval (0, 1).
+
+[Page 4]
+Hierarchical feature detection builds increasingly complex representations across layers. Early layers may respond to simple patterns, while later layers combine earlier patterns into more complex features. This is a conceptual description, not a guarantee about every trained network.
+
+[Figure 1 description]
+Conceptual flow: input features -> weighted sum plus bias -> activation function -> output. Arrows indicate forward computation.

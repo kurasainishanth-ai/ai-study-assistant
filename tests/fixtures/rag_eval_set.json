@@ -1,0 +1,31 @@
+{
+  "materials": [
+    {
+      "id": "nn_course",
+      "name": "Neural Networks",
+      "content": "--- [Page 1] ---\nInput layer neurons receive feature values and pass them to the next layer. Each neuron combines input features using weights and a bias.\n\n--- [Page 2] ---\nWeights and biases are learned parameters. The weighted sum is computed before an activation function produces the neuron's output.\n\n--- [Page 3] ---\nThe ReLU activation function returns the maximum of zero and its input. Sigmoid maps a value to a range between zero and one.\n\n--- [Page 4] ---\nHierarchical feature detection builds increasingly complex representations across neural network layers. Early layers detect simple patterns; later layers combine them."
+    },
+    {
+      "id": "db_course",
+      "name": "Database Systems",
+      "content": "--- [Page 17] ---\nA database transaction is a logical unit of work. ACID properties are atomicity, consistency, isolation, and durability. Atomicity means all operations commit or none do.\n\n--- [Page 18] ---\nDatabase normalization organizes relational tables to reduce redundancy and avoid update anomalies. First normal form requires atomic attribute values."
+    }
+  ],
+  "cases": [
+    {"id": "nn-input-layer", "query": "What does the input layer do with feature values?", "selected_material_ids": ["nn_course"], "expected_refs": ["[Page 1]"], "supported": true},
+    {"id": "nn-weights-biases", "query": "How do weights and biases affect the weighted sum?", "selected_material_ids": ["nn_course"], "expected_refs": ["[Page 2]"], "supported": true},
+    {"id": "nn-activation", "query": "How does the ReLU activation function work?", "selected_material_ids": ["nn_course"], "expected_refs": ["[Page 3]"], "supported": true},
+    {"id": "nn-hierarchical-features", "query": "Explain hierarchical feature detection in neural network layers.", "selected_material_ids": ["nn_course"], "expected_refs": ["[Page 4]"], "supported": true},
+    {"id": "db-acid", "query": "What are the ACID properties of a database transaction?", "selected_material_ids": ["db_course"], "expected_refs": ["[Page 17]"], "supported": true},
+    {"id": "nn-sigmoid-range", "query": "What range of values does sigmoid map an input to?", "selected_material_ids": ["nn_course"], "expected_refs": ["[Page 3]"], "supported": true},
+    {"id": "nn-feature-hierarchy", "query": "How do early layers detect simple patterns and later layers combine them into complex representations?", "selected_material_ids": ["nn_course"], "expected_refs": ["[Page 4]"], "supported": true},
+    {"id": "nn-input-weights", "query": "How does an input neuron combine input features using weights and a bias?", "selected_material_ids": ["nn_course"], "expected_refs": ["[Page 1]"], "supported": true},
+    {"id": "db-normalization", "query": "How does normalization reduce redundancy and prevent update anomalies in relational tables?", "selected_material_ids": ["db_course"], "expected_refs": ["[Page 18]"], "supported": true},
+    {"id": "db-first-normal-form", "query": "What does first normal form require about atomic attribute values?", "selected_material_ids": ["db_course"], "expected_refs": ["[Page 18]"], "supported": true},
+    {"id": "db-atomicity", "query": "What does atomicity mean when a database transaction commits its operations?", "selected_material_ids": ["db_course"], "expected_refs": ["[Page 17]"], "supported": true},
+    {"id": "off-material-crispr", "query": "Does this material explain CRISPR gene editing?", "selected_material_ids": ["nn_course"], "expected_refs": [], "supported": false},
+    {"id": "off-material-blockchain", "query": "Does this neural network material describe blockchain mining and cryptocurrency consensus?", "selected_material_ids": ["nn_course"], "expected_refs": [], "supported": false},
+    {"id": "off-material-photosynthesis", "query": "Explain photosynthesis in plants and the Calvin cycle.", "selected_material_ids": ["db_course"], "expected_refs": [], "supported": false},
+    {"id": "unselected-database", "query": "Explain database normalization and update anomalies.", "selected_material_ids": ["nn_course"], "expected_refs": [], "supported": false}
+  ]
+}

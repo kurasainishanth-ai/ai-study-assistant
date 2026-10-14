@@ -202,19 +202,41 @@ def extract_youtube_content(url_or_id: str, languages: Optional[List[str]] = Non
     except Exception as error:
         video_analysis_error = error
 
-    # Direct video understanding evaluates speech and visuals. If Gemini cannot
-    # access the URL or cannot decide, use the retrieved speech as content evidence.
+    # Direct video understanding evaluates speech and visuals. If it cannot
+    # access the URL or cannot decide, use captions as content evidence. When
+    # video review rejects a captioned video, independently review the speech
+    # before rejecting it: a visual-only or partial-video mistake should not
+    # override a clear, substantive lecture transcript.
     if caption_segments and (
-        analysis is None or analysis.get("decision") == "uncertain"
+        analysis is None or analysis.get("decision") in {"uncertain", "non_academic"}
     ):
         try:
-            analysis = analyze_youtube_transcript(title, transcript_text)
+            transcript_analysis = analyze_youtube_transcript(title, transcript_text)
+            if analysis is None or analysis.get("decision") == "uncertain":
+                analysis = transcript_analysis
+            elif (
+                analysis.get("decision") == "non_academic"
+                and transcript_analysis.get("decision") == "academic"
+                and transcript_analysis.get("confidence", 0) >= 0.7
+            ):
+                video_evidence = analysis.get("evidence") or "Video review classified the video as non-academic."
+                transcript_evidence = transcript_analysis.get("evidence") or "Caption review found instructional content."
+                transcript_analysis["evidence"] = (
+                    f"Caption review found academic instruction ({transcript_evidence}). "
+                    f"Direct video review disagreed: {video_evidence}"
+                )[:1200]
+                transcript_analysis["confidence"] = min(
+                    float(analysis.get("confidence", 0)),
+                    float(transcript_analysis.get("confidence", 0)),
+                )
+                analysis = transcript_analysis
         except Exception as transcript_analysis_error:
-            raise ValueError(
-                "Gemini could not review the video's content. "
-                f"Video review: {video_analysis_error or 'inconclusive'}. "
-                f"Caption review: {transcript_analysis_error}"
-            ) from transcript_analysis_error
+            if analysis is None:
+                raise ValueError(
+                    "Gemini could not review the video's content. "
+                    f"Video review: {video_analysis_error or 'inconclusive'}. "
+                    f"Caption review: {transcript_analysis_error}"
+                ) from transcript_analysis_error
 
     if analysis is None:
         caption_details = (

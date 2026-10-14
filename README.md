@@ -82,7 +82,7 @@ Runtime files such as `.env`, the local database, uploaded documents, Python env
 
 ## Features
 
-- Import PDF, DOCX, PPTX, image, and text study materials, plus academic YouTube transcripts. Gemini reviews public YouTube video content, rather than using a channel allowlist or title-only gate, to decide whether the video teaches academic material. It uses YouTube captions when available and can attempt direct video analysis and timestamped transcription when captions cannot be retrieved.
+- Import PDF, DOCX, PPTX, image, and text study materials, plus academic YouTube transcripts. Gemini reviews public YouTube video content, rather than using a channel allowlist or title-only gate, to decide whether the video teaches academic material. If video review disagrees with a confident academic assessment of available captions, the caption evidence can prevent a false rejection. It can also attempt direct video analysis and timestamped transcription when captions cannot be retrieved.
 - Upload one or multiple files. Files appear in the Library while text extraction runs in the background; they become available to Study Studio and AI Tutor when their status changes to **Ready**.
 - Generate summaries in multiple styles and ask questions grounded in uploaded material.
 - Create flashcards, diagnostic quizzes, interactive knowledge maps, downloadable infographics, and personalized revision schedules with trackable daily tasks.
@@ -104,7 +104,27 @@ Run the maintained Python tests from the project root:
 python -m unittest discover -s tests
 ```
 
+Run the small retrieval and answer-quality checks:
+
+```bash
+python scripts/evaluate_rag.py
+python scripts/evaluate_personalization.py
+python scripts/evaluate_tutor_answers.py
+```
+
+The retrieval check is deterministic and uses a 15-case fixture. The personalization check is a seeded synthetic multi-session policy simulation that exercises the production mastery estimator and question novelty filter; it is not evidence of real student learning gains. The tutor answer check makes five tutor-generation calls plus one Gemini judge call, requires a configured `GEMINI_API_KEY`, and uses a temporary SQLite database rather than the app's study database. Its faithfulness, answer-relevancy, context-precision, and context-recall scores are a small smoke-test sample—not a validated RAGAS/DeepEval benchmark or a substitute for a larger human-reviewed evaluation set.
+
 The dependencies for the legacy Streamlit utilities are optional and can be installed with `python -m pip install -r requirements-optional.txt`.
+
+## Tester pack and demo video
+
+For a ready-to-upload synthetic dataset, 18 manual QA cases, and instructions for recording a truthful product walkthrough, see:
+
+- [`docs/TESTER_DATASET_AND_GUIDE.md`](docs/TESTER_DATASET_AND_GUIDE.md)
+- [`docs/YOUTUBE_DEMO_SCRIPT.md`](docs/YOUTUBE_DEMO_SCRIPT.md)
+- Dataset files: [`sample_data/test_dataset/`](sample_data/test_dataset/)
+
+The dataset is intended for functional smoke/regression checks, not as a validated educational benchmark. The demo script is a recording aid; no video is included until the team records one.
 
 ## Contributing
 

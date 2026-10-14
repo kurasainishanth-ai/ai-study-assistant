@@ -2,6 +2,9 @@
 from unittest.mock import patch, MagicMock
 import os
 import sys
+import tempfile
+from io import BytesIO
+from PIL import Image
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend')))
 
@@ -110,6 +113,32 @@ class TestPDFExtractor(unittest.TestCase):
         self.assertIn("--- [Page 1] ---", res['content'])
         self.assertNotIn("OCR processed", res['content'])
         self.assertIn("a\n=\nb", res['content'])
+
+    @patch('services.ocr_service.ocr_image', return_value="Diagram: input flows through a processor to an output.")
+    def test_text_rich_pdf_pages_include_embedded_figure_descriptions(self, mock_ocr):
+        import fitz
+
+        image_buffer = BytesIO()
+        Image.new("RGB", (80, 60), "white").save(image_buffer, format="PNG")
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((60, 60), "A readable page explaining the following process diagram. " * 3)
+        page.insert_image(fitz.Rect(80, 100, 260, 235), stream=image_buffer.getvalue())
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_file:
+            path = temp_file.name
+        try:
+            doc.save(path)
+            doc.close()
+            result = extract_pdf_content(path)
+        finally:
+            if not doc.is_closed:
+                doc.close()
+            os.remove(path)
+
+        self.assertIn("[Page 1]", result["content"])
+        self.assertIn("Figure description - page_1_img_1.png", result["content"])
+        self.assertIn("input flows through a processor", result["content"])
+        mock_ocr.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

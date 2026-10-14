@@ -216,7 +216,9 @@ def generate_infographic(doc_id: str, infographic_type: str = "concept_overview"
 
     # Persist in SQLite
     try:
-        db.save_infographic(first_id, infographic_type, data)
+        # Save against the complete selection so the generated result can be restored
+        # when the same set of materials is selected again.
+        db.save_infographic(doc_id, infographic_type, data)
     except Exception as db_err:
         logger.warning(f"[Infographic] Could not cache to database: {db_err}")
 

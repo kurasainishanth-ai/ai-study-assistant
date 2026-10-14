@@ -1,0 +1,10 @@
+Database Systems — synthetic test notes
+
+[Page 17]
+A database transaction is a logical unit of work. The ACID properties are atomicity, consistency, isolation, and durability. Atomicity means all operations in the transaction commit, or none of them do. For example, a transfer that debits one account and credits another should not leave only one operation committed.
+
+[Page 18]
+Database normalization organizes relational tables to reduce redundant data and avoid update anomalies. First normal form (1NF) requires each attribute value to be atomic in the chosen relational model; a field should not contain a repeating list of values.
+
+[Page 19]
+Isolation concerns how concurrent transactions interact. Durability means committed changes persist despite a later system failure, subject to the database's recovery guarantees.

@@ -13,6 +13,7 @@ from datetime import datetime, date, timedelta
 from typing import Dict, Any, List, Optional
 
 import db
+from services.material_context import selected_context, split_source_ids
 
 logger = logging.getLogger("studyverse.scheduler")
 if not logger.handlers:
@@ -60,9 +61,8 @@ def get_material_topics(doc_id: str) -> Dict[str, Any]:
     Extracts authentic topics for a document and decorates them with real quiz performance.
     Does NOT fabricate quiz scores when none exist.
     """
-    mat = db.get_material(doc_id)
-    if not mat:
-        raise ValueError(f"Study material '{doc_id}' not found.")
+    mat = selected_context(doc_id)
+    source_ids = list(dict.fromkeys([doc_id, *split_source_ids(doc_id)]))
 
     doc_name = mat.get("name", "Document")
     content = mat.get("content", "") or ""
@@ -71,30 +71,32 @@ def get_material_topics(doc_id: str) -> Dict[str, Any]:
     topic_names = []
     
     # Try Knowledge Map nodes first (most granular and structured)
-    try:
-        km = db.get_knowledge_map(doc_id)
-        if km and km.get("nodes"):
-            for n in km["nodes"]:
-                label = n.get("label", "").strip()
-                if label and label not in topic_names:
-                    topic_names.append(label)
-    except Exception:
-        pass
+    for source_id in source_ids:
+        try:
+            km = db.get_knowledge_map(source_id)
+            if km and km.get("nodes"):
+                for n in km["nodes"]:
+                    label = n.get("label", "").strip()
+                    if label and label not in topic_names:
+                        topic_names.append(label)
+        except Exception:
+            pass
 
     # If few topics, check Notes headings
     if len(topic_names) < 4:
-        try:
-            notes = db.get_notes(doc_id)
-            if notes and isinstance(notes, list):
-                for note in notes:
-                    note_content = note.get("content", "")
-                    headings = re.findall(r"^##?\s+([^\n]+)", note_content, re.MULTILINE)
-                    for h in headings:
-                        h_clean = h.strip().strip("#* ")
-                        if h_clean and h_clean not in topic_names and len(h_clean) <= 60:
-                            topic_names.append(h_clean)
-        except Exception:
-            pass
+        for source_id in source_ids:
+            try:
+                notes = db.get_notes_for_material(source_id)
+                if notes and isinstance(notes, list):
+                    for note in notes:
+                        note_content = note.get("content", "")
+                        headings = re.findall(r"^##?\s+([^\n]+)", note_content, re.MULTILINE)
+                        for h in headings:
+                            h_clean = h.strip().strip("#* ")
+                            if h_clean and h_clean not in topic_names and len(h_clean) <= 60:
+                                topic_names.append(h_clean)
+            except Exception:
+                pass
 
     # Fallback to document structural extraction
     if len(topic_names) < 3:
@@ -106,7 +108,9 @@ def get_material_topics(doc_id: str) -> Dict[str, Any]:
     topic_names = topic_names[:10]  # Cap at 10 high-yield topics
 
     # 2. Correlate with genuine quiz performance
-    attempts = db.get_quiz_attempts(doc_id)
+    attempts = []
+    for source_id in source_ids:
+        attempts.extend(db.get_quiz_attempts(source_id))
     topic_quiz_scores: Dict[str, List[float]] = {}
     for a in attempts:
         tb = a.get("topic_breakdown", {})

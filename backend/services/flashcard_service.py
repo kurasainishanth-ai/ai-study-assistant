@@ -4,12 +4,11 @@ from typing import List, Dict, Any, Optional
 from google.genai import types
 from config import get_gemini_client, DEFAULT_MODEL
 import db
+from services.material_context import selected_context
 
 def generate_flashcards(doc_id: str, count: int = 8, difficulty: str = "mixed") -> List[Dict[str, Any]]:
     """Generates source-grounded flashcards from material and stores them in SQLite."""
-    material = db.get_material(doc_id)
-    if not material:
-        raise ValueError(f"Study material with ID '{doc_id}' not found.")
+    material = selected_context(doc_id)
         
     doc_content = material.get("content", "")
     if not doc_content.strip():
@@ -17,7 +16,8 @@ def generate_flashcards(doc_id: str, count: int = 8, difficulty: str = "mixed") 
 
     system_instruction = (
         "You are an expert educational flashcard creator. Your task is to extract high-yield, conceptually sound "
-        "flashcards strictly from the provided text. Return ONLY a valid JSON array of objects with the exact schema:\n"
+        "flashcards strictly from the provided text. Use all labeled source materials when several are provided, "
+        "and include source titles with page/slide references where possible. Return ONLY a valid JSON array of objects with the exact schema:\n"
         "[\n"
         "  {\n"
         '    "front": "Clear question testing a key concept",\n'

@@ -1,0 +1,23 @@
+{
+  "materials": [
+    {
+      "id": "nn_eval",
+      "name": "Neural Networks.txt",
+      "type": "Text",
+      "content": "--- [Page 1] ---\nInput layer neurons receive feature values and pass them to the next layer. Each neuron combines input features using weights and a bias.\n\n--- [Page 2] ---\nWeights and biases are learned parameters. The weighted sum is computed before an activation function produces the neuron's output.\n\n--- [Page 3] ---\nThe ReLU activation function returns the maximum of zero and its input. Sigmoid maps a value to a range between zero and one.\n\n--- [Page 4] ---\nHierarchical feature detection builds increasingly complex representations across neural network layers. Early layers detect simple patterns; later layers combine them."
+    },
+    {
+      "id": "db_eval",
+      "name": "Database Systems.txt",
+      "type": "Text",
+      "content": "--- [Page 17] ---\nA database transaction is a logical unit of work. ACID properties are atomicity, consistency, isolation, and durability. Atomicity means all operations commit or none do.\n\n--- [Page 18] ---\nDatabase normalization organizes relational tables to reduce redundancy and avoid update anomalies. First normal form requires atomic attribute values."
+    }
+  ],
+  "cases": [
+    {"id": "relu-explanation", "source_id": "nn_eval", "question": "How does the ReLU activation function work?", "expected_points": ["ReLU returns the maximum of zero and its input"], "expected_refs": ["[Page 3]"], "supported": true},
+    {"id": "weights-before-activation", "source_id": "nn_eval", "question": "What do weights and biases do before activation?", "expected_points": ["Weights and biases are learned parameters", "They contribute to the weighted sum before activation"], "expected_refs": ["[Page 2]"], "supported": true},
+    {"id": "transaction-atomicity", "source_id": "db_eval", "question": "What does atomicity mean in a database transaction?", "expected_points": ["All transaction operations commit, or none do"], "expected_refs": ["[Page 17]"], "supported": true},
+    {"id": "first-normal-form", "source_id": "db_eval", "question": "What does first normal form require?", "expected_points": ["Attribute values must be atomic"], "expected_refs": ["[Page 18]"], "supported": true},
+    {"id": "unsupported-crispr", "source_id": "nn_eval", "question": "Does this material explain CRISPR gene editing?", "expected_points": [], "expected_refs": [], "supported": false}
+  ]
+}
