@@ -5,8 +5,14 @@
   "materials": [
     {"id": "neural_networks", "file": "neural_networks.txt", "topics": ["input layer", "weights and biases", "ReLU", "sigmoid", "hierarchical features"]},
     {"id": "database_systems", "file": "database_systems.txt", "topics": ["transactions", "ACID", "atomicity", "normalization", "1NF", "isolation", "durability"]},
-    {"id": "study_skills", "file": "study_skills.txt", "topics": ["spaced practice", "retrieval practice", "feedback", "worked examples", "study planning"]}
+    {"id": "study_skills", "file": "study_skills.txt", "topics": ["spaced practice", "retrieval practice", "feedback", "worked examples", "study planning"]},
+    {"id": "algorithm_runtime_pdf", "file": "formats/algorithm_runtime.pdf", "topics": ["PDF extraction", "chart image OCR", "runtime trend", "binary search"]},
+    {"id": "study_methods_docx", "file": "formats/study_methods.docx", "topics": ["DOCX extraction", "headings", "tables", "spaced practice", "retrieval practice"]},
+    {"id": "neural_slides_pptx", "file": "formats/neural_network_slides.pptx", "topics": ["PPTX extraction", "slide citations", "neural network diagram", "ReLU"]},
+    {"id": "runtime_chart_image", "file": "formats/runtime_chart.png", "topics": ["image OCR", "chart axes", "runtime trend"]},
+    {"id": "neural_diagram_image", "file": "formats/neural_network_diagram.png", "topics": ["image OCR", "diagram labels", "arrows", "forward pass"]}
   ],
+  "generation": "Run .venv/Scripts/python.exe scripts/create_test_dataset.py to regenerate formats/ files (requires PyMuPDF, python-docx, python-pptx, Pillow).",
   "smoke_prompts": [
     {"id": "single-source", "select": ["neural_networks"], "prompt": "How does ReLU behave for z=-3 and z=4?", "evidence": ["neural_networks.txt", "Page 3"]},
     {"id": "cross-source", "select": ["neural_networks", "database_systems"], "prompt": "Compare the role of learned weights and biases with atomicity in a transaction. Do not imply they are the same concept.", "evidence": ["neural_networks.txt", "Page 2", "database_systems.txt", "Page 17"]},

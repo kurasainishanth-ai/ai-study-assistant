@@ -110,9 +110,13 @@ Run the small retrieval and answer-quality checks:
 python scripts/evaluate_rag.py
 python scripts/evaluate_personalization.py
 python scripts/evaluate_tutor_answers.py
+python scripts/evaluate_ragas.py --limit 3
+python scripts/evaluate_ragas.py --output docs/reports/ragas-full-report.json
 ```
 
-The retrieval check is deterministic and uses a 15-case fixture. The personalization check is a seeded synthetic multi-session policy simulation that exercises the production mastery estimator and question novelty filter; it is not evidence of real student learning gains. The tutor answer check makes five tutor-generation calls plus one Gemini judge call, requires a configured `GEMINI_API_KEY`, and uses a temporary SQLite database rather than the app's study database. Its faithfulness, answer-relevancy, context-precision, and context-recall scores are a small smoke-test sample—not a validated RAGAS/DeepEval benchmark or a substitute for a larger human-reviewed evaluation set.
+The default retrieval runner uses a 28-case source-labeled test set. The personalization runner uses 12 synthetic learner profiles across multiple sessions and compares adaptive practice with a random-topic control; results depend on explicit simulated learning assumptions and are not evidence of real student gains. The Gemini-as-judge answer runner is retained for a lightweight smoke check. For the named framework metrics, install the optional dependencies with `python -m pip install -r requirements-evaluation.txt`, then run `scripts/evaluate_ragas.py`. The Ragas runner calls the tutor and evaluator model and can consume API quota; `--limit 3` is only an integration smoke run, while a full run evaluates all cases. It uses a temporary SQLite database, not the normal study database. All LLM-judged scores need human review and should be reported with the dataset size and limitations.
+
+Regenerate the synthetic PDF, DOCX, PPTX, and image test assets with `python scripts/create_test_dataset.py`. For UI upload and manual test steps, see [`docs/TESTER_DATASET_AND_GUIDE.md`](docs/TESTER_DATASET_AND_GUIDE.md). For the complete source-grounding test set and multi-session student profiles, see `tests/fixtures/comprehensive_rag_eval_set.json` and `tests/fixtures/synthetic_student_profiles.json`.
 
 The dependencies for the legacy Streamlit utilities are optional and can be installed with `python -m pip install -r requirements-optional.txt`.
 

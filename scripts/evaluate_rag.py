@@ -1,5 +1,6 @@
-"""Run a small, transparent retrieval-only evaluation for StudyLane's tutor."""
+"""Run deterministic retrieval, source-isolation, and unsupported-query checks."""
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -29,18 +30,41 @@ def evaluate(dataset_path: Path, top_k: int = 6) -> dict:
         selected_ids = case["selected_material_ids"]
         selected = [materials[source_id] for source_id in selected_ids]
         chunks = retrieve_relevant_chunks(case["query"], selected, top_k=top_k)
-        expected_refs = set(case["expected_refs"])
-        retrieved_refs = {chunk["reference"] for chunk in chunks if chunk["reference"]}
-        matched_refs = expected_refs & retrieved_refs
+        expected_evidence = case.get("expected_evidence")
+        if expected_evidence is None:
+            expected_evidence = [
+                {"source_id": None, "reference": ref}
+                for ref in case.get("expected_refs", [])
+            ]
+        expected_pairs = {
+            (item.get("source_id"), item.get("reference"))
+            for item in expected_evidence
+        }
+        retrieved_pairs = {
+            (chunk.get("source_id"), chunk.get("reference"))
+            for chunk in chunks if chunk.get("reference")
+        }
+        if expected_pairs and None in {source_id for source_id, _ in expected_pairs}:
+            expected_pairs = {
+                (chunk.get("source_id"), ref)
+                for _, ref in expected_pairs
+                for chunk in chunks if chunk.get("reference") == ref
+            }
+        matched_pairs = expected_pairs & retrieved_pairs
+        expected_refs = {reference for _, reference in expected_pairs}
+        retrieved_refs = {reference for _, reference in retrieved_pairs}
         isolation_ok = all(chunk["source"] in {item["name"] for item in selected} for chunk in chunks)
         isolation_passes += int(isolation_ok)
 
         if case["supported"]:
             supported_cases += 1
-            hit_count += int(bool(matched_refs))
-            expected_total += len(expected_refs)
-            retrieved_expected += len(matched_refs)
-            relevant_retrieved += sum(chunk["reference"] in expected_refs for chunk in chunks)
+            hit_count += int(bool(matched_pairs))
+            expected_total += len(expected_pairs)
+            retrieved_expected += len(matched_pairs)
+            relevant_retrieved += sum(
+                (chunk.get("source_id"), chunk.get("reference")) in expected_pairs
+                for chunk in chunks
+            )
             retrieved_total += len(chunks)
         else:
             unsupported_cases += 1
@@ -48,14 +72,21 @@ def evaluate(dataset_path: Path, top_k: int = 6) -> dict:
 
         case_results.append({
             "id": case["id"],
-            "retrieved_refs": sorted(retrieved_refs),
-            "expected_refs": sorted(expected_refs),
-            "pass": bool(matched_refs) if case["supported"] else not chunks,
+            "retrieved_evidence": sorted(
+                [{"source_id": source_id, "reference": ref} for source_id, ref in retrieved_pairs],
+                key=lambda item: (item["source_id"] or "", item["reference"] or ""),
+            ),
+            "expected_evidence": sorted(
+                [{"source_id": source_id, "reference": ref} for source_id, ref in expected_pairs],
+                key=lambda item: (item["source_id"] or "", item["reference"] or ""),
+            ),
+            "pass": bool(matched_pairs) if case["supported"] else not chunks,
             "source_isolation_pass": isolation_ok,
         })
 
     return {
-        "scope": "retrieval only; does not evaluate generated-answer faithfulness or relevancy",
+        "dataset": dataset.get("dataset", dataset_path.name),
+        "scope": "deterministic retrieval/source-location checks only; does not evaluate generated-answer faithfulness or relevancy",
         "dataset_cases": len(dataset["cases"]),
         "supported_cases": supported_cases,
         "hit_at_k": round(hit_count / supported_cases, 3) if supported_cases else 0,
@@ -69,5 +100,14 @@ def evaluate(dataset_path: Path, top_k: int = 6) -> dict:
 
 
 if __name__ == "__main__":
-    fixture = ROOT / "tests" / "fixtures" / "rag_eval_set.json"
-    print(json.dumps(evaluate(fixture), indent=2))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", type=Path, default=ROOT / "tests" / "fixtures" / "comprehensive_rag_eval_set.json")
+    parser.add_argument("--top-k", type=int, default=6)
+    parser.add_argument("--output", type=Path, help="Optional path for a JSON result report")
+    args = parser.parse_args()
+    report = evaluate(args.dataset, top_k=args.top_k)
+    rendered = json.dumps(report, indent=2, ensure_ascii=False)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(rendered + "\n", encoding="utf-8")
+    print(rendered)

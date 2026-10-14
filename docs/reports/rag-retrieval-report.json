@@ -1,0 +1,383 @@
+{
+  "dataset": "StudyLane synthetic multi-topic source-grounding set",
+  "scope": "deterministic retrieval/source-location checks only; does not evaluate generated-answer faithfulness or relevancy",
+  "dataset_cases": 28,
+  "supported_cases": 21,
+  "hit_at_k": 0.571,
+  "context_precision": 1.0,
+  "context_recall": 0.522,
+  "unsupported_queries": 7,
+  "unsupported_false_retrieval_rate": 0.0,
+  "source_isolation_pass_rate": 1.0,
+  "cases": [
+    {
+      "id": "nn-input",
+      "retrieved_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 1]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 1]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "nn-weighted-sum",
+      "retrieved_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 2]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 2]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "nn-relu-negative",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 3]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "nn-sigmoid",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 3]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "nn-hierarchy",
+      "retrieved_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 4]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "nn",
+          "reference": "[Page 4]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "db-acid",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 17]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "db-atomicity",
+      "retrieved_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 17]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 17]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "db-normalization",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 18]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "db-1nf",
+      "retrieved_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 18]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 18]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "db-isolation",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 19]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "dsa-stack-queue",
+      "retrieved_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 2]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 2]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "dsa-binary-search",
+      "retrieved_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 5]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 5]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "dsa-bfs",
+      "retrieved_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 8]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 8]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "dsa-collision",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 11]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "skills-spaced",
+      "retrieved_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 1]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 1]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "skills-retrieval",
+      "retrieved_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 2]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 2]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "skills-feedback",
+      "retrieved_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 3]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 3]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "multi-nn-db",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "db",
+          "reference": "[Page 17]"
+        },
+        {
+          "source_id": "nn",
+          "reference": "[Page 2]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "multi-dsa-skills",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 5]"
+        },
+        {
+          "source_id": "skills",
+          "reference": "[Section 3]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "all-source-spaced",
+      "retrieved_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 1]"
+        }
+      ],
+      "expected_evidence": [
+        {
+          "source_id": "skills",
+          "reference": "[Section 1]"
+        }
+      ],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "all-source-queue",
+      "retrieved_evidence": [],
+      "expected_evidence": [
+        {
+          "source_id": "dsa",
+          "reference": "[Slide 2]"
+        }
+      ],
+      "pass": false,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "unsupported-crispr",
+      "retrieved_evidence": [],
+      "expected_evidence": [],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "unsupported-photosynthesis",
+      "retrieved_evidence": [],
+      "expected_evidence": [],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "unsupported-blockchain",
+      "retrieved_evidence": [],
+      "expected_evidence": [],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "unsupported-medical",
+      "retrieved_evidence": [],
+      "expected_evidence": [],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "unselected-database",
+      "retrieved_evidence": [],
+      "expected_evidence": [],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "unselected-neural",
+      "retrieved_evidence": [],
+      "expected_evidence": [],
+      "pass": true,
+      "source_isolation_pass": true
+    },
+    {
+      "id": "ambiguous-no-source",
+      "retrieved_evidence": [],
+      "expected_evidence": [],
+      "pass": true,
+      "source_isolation_pass": true
+    }
+  ]
+}

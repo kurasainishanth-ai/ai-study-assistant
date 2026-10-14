@@ -1,60 +1,112 @@
-# StudyLane demo video script
+# StudyLane — record-ready demonstration video
 
-**Target runtime:** 4–5 minutes  
-**Audience:** Hackathon judges and first-time users  
-**Recording note:** This is a recording script, not a claim that a video has already been recorded. Use a clean test account/workspace and the bundled tester dataset. Avoid showing API keys, personal files, or real student records.
+**Target duration:** 6–7 minutes (comfortably within the required 3–10 minutes)<br>
+**Audience:** Hackathon judges and first-time users<br>
+**Format:** Screen recording with narration; no special effects required.
 
-## 0:00–0:20 — Opening
+This is a script for a video the team still needs to record. It is written around the current StudyLane prototype and synthetic demo materials. Read the quoted narration naturally; bracketed instructions are actions for the presenter, not spoken lines. Do not claim a behavior worked unless it is visible in the recording.
 
-**On screen:** StudyLane dashboard.
+## Before recording
 
-**Say:** “Students often have notes, slides, and videos in different places, while their weak topics and study progress are tracked somewhere else. StudyLane brings those materials and study tools into one learning workspace, with an AI tutor that can use the selected study sources.”
+- Start the backend and frontend; open StudyLane in a clean demo workspace.
+- Check that the Gemini API key is configured, but never show `.env`, credentials, terminals containing secrets, or personal student data.
+- Upload these synthetic files in **Library** before recording, and wait for **Ready**: `neural_networks.txt`, `database_systems.txt`, `study_skills.txt`, and `formats/algorithm_runtime.pdf` from `sample_data/test_dataset/`. Optionally add `formats/neural_network_slides.pptx` to show slide ingestion. Pre-uploading avoids dead air while extraction runs.
+- Have one quiz ready or plan to generate one during recording. Use a fresh demo workspace so progress is easy to explain.
+- If an API result or citation is wrong, pause and re-record that section. Do not edit a failure to look like a successful result.
 
-## 0:20–0:55 — Add and select learning materials
+## 0:00–0:35 — Hook and product
 
-**On screen:** Library. Add the three text files from `sample_data/test_dataset/` (and optionally a PDF or YouTube link that you have permission to use). Wait until extraction finishes and the materials show Ready. Open Ask Tutor’s source selector and select all three materials.
+**On screen:** StudyLane dashboard, then a brief view of Library, Study Studio, and Ask Tutor.
 
-**Say:** “For this demo I’ve loaded a small, deliberately cross-topic test pack: neural networks, database transactions, and study skills. Selecting more than one source lets us check that answers are not silently limited to a single document.”
+**Say:**
 
-## 0:55–1:40 — Grounded tutor and source references
+“When students study from slides, textbooks, and videos, their materials, practice, and progress often end up disconnected. StudyLane is a study workspace that brings those pieces together: add learning materials, create study activities, ask a tutor grounded in selected sources, and use practice history to guide what to review next. I’ll show the full path using synthetic course materials.”
 
-**On screen:** Ask Tutor. Ask: “Compare atomicity in database transactions with the idea of updating model weights.” Then open the displayed references.
+## 0:35–1:25 — Source-upload workflow
 
-**Say:** “The tutor should combine relevant material from the selected sources and show where its evidence came from. I can open a reference to inspect the source. If the selected material does not contain an answer, the tutor should say so instead of presenting an unsupported claim as sourced.”
+**On screen:** Open **Library**. Show the four preloaded materials and their Ready status. Briefly open a material’s details or preview. Point out the PDF and, if uploaded, the slide deck.
 
-**On screen:** Ask: “What does the study-skills note say about spaced practice?” Then ask an unsupported question such as “What is the capital of Japan?”
+**Say:**
 
-**Say:** “This also checks a focused question and an out-of-scope question. Grounding is useful only when the student can tell which statements are supported.”
+“First, materials enter through the Library. StudyLane accepts common study formats such as text, PDF, Word documents, presentations, and images, and can also process supported public YouTube videos. Extraction runs before a material is ready to use. Page, slide, or timestamp markers are kept with extracted content where available, so the tutor and study tools can point back to evidence.”
 
-## 1:40–2:25 — Study Studio outputs
+**Action:** If showing upload live, add one small file and wait for Ready. Otherwise, show the completed extraction status; do not imply the upload is still processing.
 
-**On screen:** Select the neural-network and database documents; generate a summary or notes, then create flashcards or a knowledge map.
+## 1:25–2:35 — Grounded tutor interaction
 
-**Say:** “Study Studio turns selected materials into revision formats. I’m checking that the output reflects the chosen sources and preserves important terms, rather than just looking polished.”
+**On screen:** Open **Ask Tutor**. Select **Database Systems** in the source picker. Ask: “What does atomicity mean in a database transaction?” Wait for the response. Show the citation/reference and open it if the UI allows.
 
-## 2:25–3:15 — Quiz and feedback
+**Say:**
 
-**On screen:** Create a quiz. Choose 5 questions and a difficulty. If numerical questions are offered, answer one correctly and one incorrectly; otherwise demonstrate another available question type. Review the score and topic feedback.
+“In Ask Tutor, I choose the source I want the answer grounded in. I’ll ask: ‘What does atomicity mean in a database transaction?’ The tutor retrieves relevant passages from that selected material, sends the evidence with my question to the language model, and returns an answer with a source reference. I can inspect the cited material instead of treating the response as a black box.”
 
-**Say:** “The quiz supports configurable length and difficulty. After answering, the student can review correctness and topic-level feedback. This sample pack is small, so this is a product-flow demonstration—not proof of assessment validity.”
+**Action:** Read or paraphrase only what the actual answer says. Open its source reference and show the matching page or material name.
 
-## 3:15–4:00 — Progress and next focus
+**On screen:** Switch the selected material to **Neural Networks**. Ask: “What range of values does sigmoid produce?” Show the resulting reference.
 
-**On screen:** Dashboard progress / topic mastery, then Ask Tutor. Ask: “Based on my recent quiz results, what should I review next?” If the test account has no quiz history, complete the short quiz first.
+**Say:**
 
-**Say:** “The intended loop is practice, feedback, and a targeted next step. Progress estimates are signals from recorded activity, not a diagnosis or a guarantee of learning. The student remains in control of their revision plan.”
+“Now I’ve changed the selected source, so this question is about a different course. The answer should be grounded in the neural-network notes, not the database material. Source selection and citations make that boundary visible.”
 
-## 4:00–4:35 — Close and honest limitations
+**Optional, only if the result is clear:** Select **Database Systems** and ask about a topic not in that file, such as photosynthesis. Show how the actual response handles missing evidence. Do not describe this as perfect refusal behavior; the prototype still needs broader testing.
 
-**On screen:** Show the README or tester guide and end on the app.
+## 2:35–3:35 — Assessment pipeline
 
-**Say:** “StudyLane connects uploaded learning sources with tutoring, study tools, and progress tracking. This prototype still needs broader human evaluation across real subjects and learners; the bundled test data is for repeatable functional checks, not a substitute for that evaluation. The goal is to make studying more connected, inspectable, and responsive to the learner.”
+**On screen:** Open the quiz tool in Study Studio. Select a material, set **5 questions**, choose a difficulty, and generate the quiz. Answer at least one item; show feedback or the result screen.
 
-## Recording checklist
+**Say:**
 
-- Confirm the backend and frontend are running and the API key is not visible.
-- Use a fresh demo workspace; upload the bundled dataset and wait for Ready status.
-- Select all three sources before the cross-source question; check each citation opens the expected material.
-- Do not imply unsupported questions are always refused perfectly; show the observed result accurately.
-- Keep the video between 3 and 10 minutes, enable captions if available, and include the repository/setup link in the description.
-- Re-record or narrate around any failed feature; do not edit a failure into a success claim.
+“Next is the assessment loop. I select the material, set the quiz length and difficulty, and generate questions from the study content. The prototype supports several question formats, including multiple choice, short answer, true/false, and numerical questions when appropriate. After a response, it checks the answer, shows feedback, and records topic-level quiz evidence for progress tracking.”
+
+**Action:** Use an actual question from the generated quiz. Answer it, then point to the displayed correctness and explanation. If the generated quiz does not include a numerical question, say “This run generated [actual type] questions”; do not imply every quiz contains every type.
+
+## 3:35–4:25 — Study tools and progress
+
+**On screen:** Use **Study Studio** to create one quick output—notes, flashcards, or a knowledge map—from a selected material. Then show the dashboard’s topic/progress view.
+
+**Say:**
+
+“The same selected materials can also be turned into revision formats such as notes, flashcards, or a knowledge map. Quiz activity contributes topic-level evidence to the learner view. The mastery estimate is a lightweight, recency-aware summary of recorded attempts—not a diagnosis, and not proof that a student has mastered a topic.”
+
+**Action:** Show one generated output and one topic progress indicator. Keep personal or unrelated data out of frame.
+
+## 4:25–5:25 — Technical architecture
+
+**On screen:** Show this simple architecture slide or draw the flow on screen:
+
+```text
+Student
+  ↓
+React + Vite interface
+  ↓ HTTP API
+FastAPI backend ──→ format extractors / OCR / transcript processing
+  ↓                              ↓
+SQLite persistence ← extracted text + page/slide/time references
+  ↓
+Selected-source retrieval → Gemini tutor / study-tool generation
+  ↓
+Answer + citations / quiz grading + topic evidence
+  ↓
+Saved chat, study outputs, and learner progress
+```
+
+**Say:**
+
+“At a high level, the browser interface is built with React and Vite, and communicates with a FastAPI backend. Format-specific extractors prepare uploaded material; OCR or transcript processing is used where supported. The backend stores materials, chats, generated study outputs, and learning activity in SQLite. For Ask Tutor, the selected-source retrieval step supplies relevant passages to Gemini. Quiz results update the learner context, which can inform later recommendations. This is a prototype architecture: the current retrieval and personalization evaluations show areas that still need improvement.”
+
+## 5:25–6:05 — Close
+
+**On screen:** Return to Ask Tutor or the dashboard. Keep the app visible for the final line.
+
+**Say:**
+
+“That’s the StudyLane workflow: upload learning sources, study and practice from them, inspect tutor references, and use recorded attempts to guide revision. Our test pack and evaluation runners make it possible to check source retrieval and simulated learner behavior, but synthetic results are not a substitute for testing with real courses and students. The next step is broader human review of answer quality, source citations, and personalization. Thanks for watching.”
+
+## Final recording checklist
+
+- Final duration is between **3 and 10 minutes**; this script is paced for about 6–7 minutes.
+- The recording visibly demonstrates material upload/readiness, grounded tutor questions and source references, quiz generation and feedback, and the architecture.
+- Keep API credentials, private study files, and personal student information off screen.
+- Use captions if available; check audio and screen text are readable.
+- Include the repository/setup instructions and note that the supplied test materials are synthetic.
+- Report observed behavior honestly; do not present simulated gains as real learning outcomes or a smoke test as a full benchmark.

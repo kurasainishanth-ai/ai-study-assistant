@@ -1,0 +1,303 @@
+{
+  "dataset": "StudyLane synthetic course-topic cohort",
+  "scope": "seeded synthetic simulation; not real student evidence; improvement depends on the documented assumed practice effect",
+  "seed": 31,
+  "profiles": 12,
+  "sessions_per_arm": 6,
+  "topic_count": 5,
+  "topics": [
+    "Neural Networks / weighted sum and bias",
+    "Neural Networks / activation functions",
+    "Database Systems / ACID transactions",
+    "Data Structures / search and graphs",
+    "Study Skills / retrieval practice"
+  ],
+  "weakest_topic_selection_accuracy": 0.514,
+  "mean_adaptive_estimated_mastery_change_percentage_points": -1.12,
+  "mean_adaptive_latent_gain_percentage_points": 2.39,
+  "mean_random_control_latent_gain_percentage_points": 2.27,
+  "adaptive_minus_random_simulated_gain_points": 0.13,
+  "final_mastery_calibration_mae_0_to_1": 0.144,
+  "candidate_question_repetition_rate_before_filter": 0.625,
+  "repetition_rate_after_filter": 0.0,
+  "repeated_candidates_filtered": 90,
+  "accepted_questions": 54,
+  "profiles_summary": [
+    {
+      "profile_id": "P01",
+      "profile_type": "weak neural foundations",
+      "true_weak_topic": "Neural Networks / weighted sum and bias",
+      "adaptive_topic_choices": [
+        "Study Skills / retrieval practice",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 37.1,
+        "Neural Networks / activation functions": 50.0,
+        "Database Systems / ACID transactions": 50.0,
+        "Data Structures / search and graphs": 60.6,
+        "Study Skills / retrieval practice": 55.9
+      },
+      "adaptive_latent_gain_percentage_points": 2.55,
+      "random_control_latent_gain_percentage_points": 2.4,
+      "adaptive_estimated_mastery_change_points": -2.08
+    },
+    {
+      "profile_id": "P02",
+      "profile_type": "weak neural foundations",
+      "true_weak_topic": "Neural Networks / activation functions",
+      "adaptive_topic_choices": [
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 45.7,
+        "Neural Networks / activation functions": 56.9,
+        "Database Systems / ACID transactions": 56.3,
+        "Data Structures / search and graphs": 55.3,
+        "Study Skills / retrieval practice": 54.4
+      },
+      "adaptive_latent_gain_percentage_points": 2.35,
+      "random_control_latent_gain_percentage_points": 2.2,
+      "adaptive_estimated_mastery_change_points": 2.3
+    },
+    {
+      "profile_id": "P03",
+      "profile_type": "weak databases",
+      "true_weak_topic": "Database Systems / ACID transactions",
+      "adaptive_topic_choices": [
+        "Study Skills / retrieval practice",
+        "Neural Networks / activation functions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 58.6,
+        "Neural Networks / activation functions": 59.1,
+        "Database Systems / ACID transactions": 18.3,
+        "Data Structures / search and graphs": 50.0,
+        "Study Skills / retrieval practice": 64.7
+      },
+      "adaptive_latent_gain_percentage_points": 2.55,
+      "random_control_latent_gain_percentage_points": 2.2,
+      "adaptive_estimated_mastery_change_points": -0.94
+    },
+    {
+      "profile_id": "P04",
+      "profile_type": "weak databases",
+      "true_weak_topic": "Database Systems / ACID transactions",
+      "adaptive_topic_choices": [
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 58.6,
+        "Neural Networks / activation functions": 57.4,
+        "Database Systems / ACID transactions": 49.4,
+        "Data Structures / search and graphs": 60.6,
+        "Study Skills / retrieval practice": 58.8
+      },
+      "adaptive_latent_gain_percentage_points": 2.4,
+      "random_control_latent_gain_percentage_points": 2.05,
+      "adaptive_estimated_mastery_change_points": -9.02
+    },
+    {
+      "profile_id": "P05",
+      "profile_type": "weak algorithms",
+      "true_weak_topic": "Data Structures / search and graphs",
+      "adaptive_topic_choices": [
+        "Data Structures / search and graphs",
+        "Data Structures / search and graphs",
+        "Data Structures / search and graphs",
+        "Data Structures / search and graphs",
+        "Data Structures / search and graphs",
+        "Data Structures / search and graphs"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 58.6,
+        "Neural Networks / activation functions": 57.4,
+        "Database Systems / ACID transactions": 62.6,
+        "Data Structures / search and graphs": 43.7,
+        "Study Skills / retrieval practice": 50.0
+      },
+      "adaptive_latent_gain_percentage_points": 2.55,
+      "random_control_latent_gain_percentage_points": 2.25,
+      "adaptive_estimated_mastery_change_points": -5.06
+    },
+    {
+      "profile_id": "P06",
+      "profile_type": "weak algorithms",
+      "true_weak_topic": "Data Structures / search and graphs",
+      "adaptive_topic_choices": [
+        "Neural Networks / weighted sum and bias",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 59.0,
+        "Neural Networks / activation functions": 50.0,
+        "Database Systems / ACID transactions": 42.9,
+        "Data Structures / search and graphs": 50.0,
+        "Study Skills / retrieval practice": 54.4
+      },
+      "adaptive_latent_gain_percentage_points": 2.4,
+      "random_control_latent_gain_percentage_points": 2.2,
+      "adaptive_estimated_mastery_change_points": 5.14
+    },
+    {
+      "profile_id": "P07",
+      "profile_type": "weak study strategies",
+      "true_weak_topic": "Study Skills / retrieval practice",
+      "adaptive_topic_choices": [
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias",
+        "Data Structures / search and graphs",
+        "Data Structures / search and graphs",
+        "Data Structures / search and graphs",
+        "Study Skills / retrieval practice"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 52.5,
+        "Neural Networks / activation functions": 57.4,
+        "Database Systems / ACID transactions": 56.3,
+        "Data Structures / search and graphs": 57.7,
+        "Study Skills / retrieval practice": 18.9
+      },
+      "adaptive_latent_gain_percentage_points": 2.4,
+      "random_control_latent_gain_percentage_points": 2.4,
+      "adaptive_estimated_mastery_change_points": -3.98
+    },
+    {
+      "profile_id": "P08",
+      "profile_type": "weak study strategies",
+      "true_weak_topic": "Study Skills / retrieval practice",
+      "adaptive_topic_choices": [
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions",
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / weighted sum and bias",
+        "Data Structures / search and graphs"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 51.8,
+        "Neural Networks / activation functions": 53.9,
+        "Database Systems / ACID transactions": 62.6,
+        "Data Structures / search and graphs": 50.0,
+        "Study Skills / retrieval practice": 50.0
+      },
+      "adaptive_latent_gain_percentage_points": 2.35,
+      "random_control_latent_gain_percentage_points": 2.45,
+      "adaptive_estimated_mastery_change_points": 1.12
+    },
+    {
+      "profile_id": "P09",
+      "profile_type": "broad novice",
+      "true_weak_topic": "Database Systems / ACID transactions",
+      "adaptive_topic_choices": [
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Neural Networks / activation functions",
+        "Study Skills / retrieval practice",
+        "Study Skills / retrieval practice",
+        "Study Skills / retrieval practice"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 58.6,
+        "Neural Networks / activation functions": 60.5,
+        "Database Systems / ACID transactions": 54.3,
+        "Data Structures / search and graphs": 55.3,
+        "Study Skills / retrieval practice": 41.8
+      },
+      "adaptive_latent_gain_percentage_points": 2.35,
+      "random_control_latent_gain_percentage_points": 2.5,
+      "adaptive_estimated_mastery_change_points": 1.04
+    },
+    {
+      "profile_id": "P10",
+      "profile_type": "broad novice",
+      "true_weak_topic": "Data Structures / search and graphs",
+      "adaptive_topic_choices": [
+        "Neural Networks / weighted sum and bias",
+        "Neural Networks / activation functions",
+        "Data Structures / search and graphs",
+        "Neural Networks / activation functions",
+        "Data Structures / search and graphs",
+        "Neural Networks / activation functions"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 59.0,
+        "Neural Networks / activation functions": 39.0,
+        "Database Systems / ACID transactions": 50.0,
+        "Data Structures / search and graphs": 48.3,
+        "Study Skills / retrieval practice": 50.0
+      },
+      "adaptive_latent_gain_percentage_points": 2.35,
+      "random_control_latent_gain_percentage_points": 2.65,
+      "adaptive_estimated_mastery_change_points": 8.2
+    },
+    {
+      "profile_id": "P11",
+      "profile_type": "advanced with one gap",
+      "true_weak_topic": "Database Systems / ACID transactions",
+      "adaptive_topic_choices": [
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Database Systems / ACID transactions",
+        "Study Skills / retrieval practice",
+        "Data Structures / search and graphs",
+        "Neural Networks / activation functions"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 67.2,
+        "Neural Networks / activation functions": 70.8,
+        "Database Systems / ACID transactions": 66.3,
+        "Data Structures / search and graphs": 82.6,
+        "Study Skills / retrieval practice": 80.0
+      },
+      "adaptive_latent_gain_percentage_points": 2.0,
+      "random_control_latent_gain_percentage_points": 1.95,
+      "adaptive_estimated_mastery_change_points": 1.0
+    },
+    {
+      "profile_id": "P12",
+      "profile_type": "advanced with one gap",
+      "true_weak_topic": "Neural Networks / activation functions",
+      "adaptive_topic_choices": [
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions",
+        "Neural Networks / activation functions"
+      ],
+      "adaptive_final_mastery_estimate": {
+        "Neural Networks / weighted sum and bias": 67.2,
+        "Neural Networks / activation functions": 47.1,
+        "Database Systems / ACID transactions": 62.6,
+        "Data Structures / search and graphs": 55.3,
+        "Study Skills / retrieval practice": 58.8
+      },
+      "adaptive_latent_gain_percentage_points": 2.45,
+      "random_control_latent_gain_percentage_points": 1.95,
+      "adaptive_estimated_mastery_change_points": -11.1
+    }
+  ]
+}
